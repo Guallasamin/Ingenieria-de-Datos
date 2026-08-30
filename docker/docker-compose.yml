@@ -1,0 +1,137 @@
+# =====================================================================
+# Taller Individual - Semana 1 | Ingenieria de Datos
+# Infraestructura ETL + Data Warehouse (100% contenerizada)
+# ---------------------------------------------------------------------
+#   postgres  -> FUENTE 1 (schema staging) + DESTINO DW (schema dw)
+#   mysql     -> FUENTE 2 (catalogos maestros / dimensiones de negocio)
+#   adminer   -> consola web para inspeccionar ambos motores
+#   metabase  -> capa OLAP / visualizacion del cubo (perfil "bi")
+#   etl       -> runtime Python de respaldo y de carga inicial
+# =====================================================================
+name: taller-etl-dw
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: etl_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: etl_user
+      POSTGRES_PASSWORD: etl_pass_2026
+      POSTGRES_DB: banca_ec
+      TZ: America/Guayaquil
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U etl_user -d banca_ec"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mysql:
+    image: mysql:8.0
+    container_name: etl_mysql
+    restart: unless-stopped
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --local-infile=1
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass_2026
+      MYSQL_DATABASE: catalogos_sb
+      MYSQL_USER: etl_user
+      MYSQL_PASSWORD: etl_pass_2026
+      TZ: America/Guayaquil
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uetl_user -petl_pass_2026 --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  adminer:
+    image: adminer:4-standalone
+    container_name: etl_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: dracula
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+  etl:
+    image: python:3.11-slim
+    container_name: etl_runtime
+    working_dir: /proyecto
+    environment:
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_DB: banca_ec
+      PG_USER: etl_user
+      PG_PASS: etl_pass_2026
+      MY_HOST: mysql
+      MY_PORT: "3306"
+      MY_DB: catalogos_sb
+      MY_USER: etl_user
+      MY_PASS: etl_pass_2026
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ..:/proyecto
+      - pipcache:/root/.cache/pip
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-lc"]
+    # El script va como UN solo elemento de lista: si se pasa como cadena,
+    # compose la divide en argumentos y "bash -lc" solo ejecutaria el primero.
+    command:
+      - |
+        set -e
+        apt-get update -qq
+        apt-get install -y -qq --no-install-recommends \
+          libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 \
+          libffi8 fonts-dejavu-core poppler-utils > /dev/null
+        pip install --quiet --no-input pandas openpyxl SQLAlchemy \
+          psycopg2-binary PyMySQL cryptography weasyprint
+        echo ">> Runtime ETL listo (pandas, SQLAlchemy, WeasyPrint)."
+        tail -f /dev/null
+
+  # Perfil opcional: docker compose --profile bi up -d
+  metabase:
+    image: metabase/metabase:latest
+    container_name: etl_metabase
+    profiles: ["bi"]
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: banca_ec
+      MB_DB_PORT: 5432
+      MB_DB_USER: etl_user
+      MB_DB_PASS: etl_pass_2026
+      MB_DB_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  mysqldata:
+  pipcache:

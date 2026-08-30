@@ -1,0 +1,222 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+    <title>Informe tecnico - Flujo ETL y Data Warehouse</title><style>
+    /* Tipografias institucionales USFQ: Baskerville para titulos y
+       Helvetica para texto. Se declaran primero las fuentes del sistema y
+       despues los sustitutos web para los entornos que no las tengan. */
+    @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Arimo:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+    @page { size: A4; margin: 20mm 18mm 18mm 18mm;
+            @bottom-center { content: counter(page) " de " counter(pages);
+                             font-size: 8.5pt; color: #8a8b8c; } }
+    @page :first { margin-top: 0; }
+    * { box-sizing: border-box; }
+    body { font-family: Helvetica, "Helvetica Neue", Arimo, Arial, sans-serif;
+           font-size: 9.7pt; line-height: 1.52; color: #231f20; margin: 0; }
+    h1, h2, h3, .display {
+           font-family: Baskerville, "Baskerville Old Face", "Libre Baskerville",
+                        "Hoefler Text", Garamond, "Times New Roman", serif; }
+    h1 { font-size: 22pt; margin: 0 0 6pt; font-weight: 700; line-height: 1.15; }
+    h2 { font-size: 14pt; font-weight: 700; margin: 18pt 0 8pt;
+         padding-bottom: 4pt; border-bottom: 1.5pt solid #ed1c24;
+         color: #231f20; page-break-after: avoid; }
+    h3 { font-size: 11pt; font-weight: 700; margin: 13pt 0 5pt;
+         color: #231f20; page-break-after: avoid; }
+    p  { margin: 0 0 7pt; text-align: justify; }
+    .portada { background: #231f20; color: #ffffff; padding: 22mm 18mm 14mm;
+               margin: 0 0 14pt; }
+    .portada .filete { width: 46mm; height: 3pt; background: #ed1c24;
+                       margin-bottom: 12pt; }
+    .portada h1 { color: #ffffff; font-size: 25pt; }
+    .portada .sub { font-size: 11.5pt; margin-top: 8pt; color: #d8d4cb;
+                    font-family: Helvetica, "Helvetica Neue", Arimo, Arial, sans-serif; }
+    .portada .meta { font-size: 9pt; color: #d8d4cb; margin-top: 18pt;
+                     border-top: 0.5pt solid #4a4b4c; padding-top: 10pt; }
+    .portada .meta b { color: #ffffff; }
+    table { width: 100%; border-collapse: collapse; margin: 7pt 0 11pt;
+            font-size: 8.6pt; page-break-inside: avoid; }
+    th { background: #faf3e9; text-align: left; padding: 5pt 7pt; font-weight: 700;
+         border-top: 0.8pt solid #231f20; border-bottom: 0.8pt solid #d8d4cb; }
+    td { padding: 4.5pt 7pt; border-bottom: 0.4pt solid #e3ded4; }
+    td.n { text-align: right; font-variant-numeric: tabular-nums; }
+    .kpis { display: flex; gap: 7pt; margin: 10pt 0 12pt; }
+    .kpi { flex: 1; border: 0.5pt solid #d8d4cb; border-top: 2.5pt solid #ed1c24;
+           padding: 8pt 9pt; }
+    .kpi .v { font-family: Baskerville, "Baskerville Old Face", "Libre Baskerville",
+              Garamond, serif; font-size: 17pt; font-weight: 700; line-height: 1; }
+    .kpi .l { font-size: 7.6pt; color: #4a4b4c; margin-top: 3pt; line-height: 1.3; }
+    .fig { margin: 8pt 0 11pt; page-break-inside: avoid; }
+    /* Las figuras se escalan para que no fuercen saltos de pagina */
+    .fig svg { display: block; margin: 0 auto; max-width: 80%; }
+    .fig .cap { font-size: 8pt; color: #4a4b4c; margin-top: 4pt; }
+    .fig .cap b { color: #231f20; }
+    .nota { background: #faf3e9; border-left: 2.5pt solid #ed1c24;
+            padding: 7pt 10pt; margin: 9pt 0 12pt; font-size: 8.7pt; }
+    code { font-family: "Courier New", Consolas, monospace; font-size: 8.4pt;
+           background: #faf3e9; padding: 0.5pt 3pt; }
+    pre { background: #faf3e9; border-left: 2.5pt solid #d8d4cb; padding: 8pt 10pt;
+          font-family: "Courier New", Consolas, monospace; font-size: 8pt;
+          line-height: 1.45; white-space: pre-wrap; overflow-wrap: break-word;
+          page-break-inside: avoid; margin: 0 0 10pt; }
+    ul, ol { margin: 0 0 8pt; padding-left: 15pt; }
+    li { margin-bottom: 3.5pt; }
+    .salto { page-break-before: always; }
+    </style></head><body>
+
+    <div class="portada">
+      <div class="filete"></div>
+      <div style="font-size:8.5pt;letter-spacing:1.3pt;color:#d8d4cb">
+        UNIVERSIDAD SAN FRANCISCO DE QUITO &nbsp;·&nbsp; INGENIER&Iacute;A DE DATOS</div>
+      <h1>Flujo ETL multifuente y Data Warehouse dimensional del sistema de banca privada del Ecuador</h1>
+      <div class="sub">Informe t&eacute;cnico &middot; Taller individual, semana 1</div>
+      <div class="meta">
+        <b>Fuente:</b> Superintendencia de Bancos del Ecuador, boletines de colocaciones y
+        captaciones de la banca privada &nbsp;&middot;&nbsp;
+        <b>Periodo:</b> enero 2024 &ndash; mayo 2026 (29 cortes mensuales) &nbsp;&middot;&nbsp;
+        <b>Fecha:</b> 30/08/2026
+      </div>
+    </div>
+
+    <h2>1. Objeto y alcance</h2>
+    <p>Se construye un flujo ETL que integra cuatro fuentes de datos heterog&eacute;neas y las
+    consolida en un Data Warehouse dimensional en modelo estrella, con seis dimensiones y una
+    tabla de hechos. El conjunto de entrada consta de 18 libros Excel de la Superintendencia de
+    Bancos del Ecuador, con el detalle mensual de la cartera de cr&eacute;dito y de los
+    dep&oacute;sitos de las 26 razones sociales de la banca privada, desagregado por
+    cant&oacute;n. La infraestructura se ejecuta en contenedores Docker.</p>
+
+    <div class="kpis">
+      <div class="kpi"><div class="v">4</div><div class="l">Fuentes de datos integradas</div></div>
+      <div class="kpi"><div class="v">6 + 1</div><div class="l">Dimensiones y tabla de hechos</div></div>
+      <div class="kpi"><div class="v">176.990</div><div class="l">Registros de hechos cargados</div></div>
+      <div class="kpi"><div class="v">122</div><div class="l">Nodos del flujo de KNIME</div></div>
+    </div>
+
+    <h2>2. Arquitectura y fuentes de datos</h2>
+    <p>La arquitectura se organiza en tres capas: aterrizaje (<code>staging</code>), almac&eacute;n
+    dimensional (<code>dw</code>) y capa de explotaci&oacute;n OLAP. Cada fuente se materializa en
+    una tecnolog&iacute;a distinta, de modo que el flujo resuelve diferencias de protocolo de
+    conexi&oacute;n, formato y esquema.</p>
+    <table><thead><tr><th>Código</th><th>Tecnología</th><th>Alimenta</th><th>Filas</th></tr></thead><tbody><tr><td class="">F1_POSTGRES</td><td class="">PostgreSQL</td><td class="">Hechos</td><td class="n">122.217</td></tr><tr><td class="">F2_MYSQL</td><td class="">MySQL</td><td class="">Dimensiones</td><td class="n">177</td></tr><tr><td class="">F3_EXCEL</td><td class="">Excel XLSX</td><td class="">Hechos</td><td class="n">45.341</td></tr><tr><td class="">F4_CSV</td><td class="">CSV</td><td class="">Hechos</td><td class="n">9.432</td></tr></tbody></table>
+    <div class="fig"><svg viewBox="0 0 780 300" width="100%" role="img" aria-label="Arquitectura: 4 fuentes, ETL KNIME, Data Warehouse, capa OLAP"><rect x="6" y="14" width="196" height="54" rx="7" fill="#ffffff" stroke="#231f20" stroke-width="1.5"/><text x="18" y="34" font-size="12" font-weight="700" fill="#231f20">PostgreSQL</text><text x="18" y="49" font-size="10" fill="#4a4b4c">staging.captaciones</text><text x="18" y="62" font-size="9.5" fill="#8a8b8c">122.217 filas</text><path d="M206 41 H246" stroke="#d8d4cb" stroke-width="1.5" marker-end="url(#fl)"/><rect x="6" y="84" width="196" height="54" rx="7" fill="#ffffff" stroke="#231f20" stroke-width="1.5"/><text x="18" y="104" font-size="12" font-weight="700" fill="#231f20">MySQL</text><text x="18" y="119" font-size="10" fill="#4a4b4c">catalogos_sb (5 tablas)</text><text x="18" y="132" font-size="9.5" fill="#8a8b8c">177 filas</text><path d="M206 111 H246" stroke="#d8d4cb" stroke-width="1.5" marker-end="url(#fl)"/><rect x="6" y="154" width="196" height="54" rx="7" fill="#ffffff" stroke="#231f20" stroke-width="1.5"/><text x="18" y="174" font-size="12" font-weight="700" fill="#231f20">Excel XLSX</text><text x="18" y="189" font-size="10" fill="#4a4b4c">10 libros 2024-2025</text><text x="18" y="202" font-size="9.5" fill="#8a8b8c">45.341 filas</text><path d="M206 181 H246" stroke="#d8d4cb" stroke-width="1.5" marker-end="url(#fl)"/><rect x="6" y="224" width="196" height="54" rx="7" fill="#ffffff" stroke="#231f20" stroke-width="1.5"/><text x="18" y="244" font-size="12" font-weight="700" fill="#231f20">CSV</text><text x="18" y="259" font-size="10" fill="#4a4b4c">colocaciones_2026.csv</text><text x="18" y="272" font-size="9.5" fill="#8a8b8c">9.432 filas</text><path d="M206 251 H246" stroke="#d8d4cb" stroke-width="1.5" marker-end="url(#fl)"/><defs><marker id="fl" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#d8d4cb"/></marker></defs><rect x="250" y="40" width="176" height="200" rx="8" fill="#fbf9f6" stroke="#ed1c24" stroke-width="1.5"/><text x="338" y="66" text-anchor="middle" font-size="13" font-weight="700" fill="#ed1c24">ETL — KNIME</text><text x="268" y="92" font-size="10.5" fill="#4a4b4c">• Concatenate</text><text x="268" y="110" font-size="10.5" fill="#4a4b4c">• String Manipulation</text><text x="268" y="128" font-size="10.5" fill="#4a4b4c">• Joiner (enriquecer)</text><text x="268" y="146" font-size="10.5" fill="#4a4b4c">• Rule Engine</text><text x="268" y="164" font-size="10.5" fill="#4a4b4c">• Math Formula</text><text x="268" y="182" font-size="10.5" fill="#4a4b4c">• Row Filter (calidad)</text><text x="268" y="200" font-size="10.5" fill="#4a4b4c">• SCD Tipo 2</text><text x="268" y="218" font-size="10.5" fill="#4a4b4c">• DB Insert</text><path d="M430 140 H470" stroke="#d8d4cb" stroke-width="1.5" marker-end="url(#fl)"/><rect x="474" y="40" width="176" height="200" rx="8" fill="#ffffff" stroke="#231f20" stroke-width="1.5"/><text x="562" y="66" text-anchor="middle" font-size="13" font-weight="700" fill="#231f20">DW — modelo estrella</text><text x="492" y="92" font-size="10.5" fill="#4a4b4c">• dim_tiempo (29)</text><text x="492" y="110" font-size="10.5" fill="#4a4b4c">• dim_entidad (26, SCD2)</text><text x="492" y="128" font-size="10.5" fill="#4a4b4c">• dim_geografia (126)</text><text x="492" y="146" font-size="10.5" fill="#4a4b4c">• dim_producto (19)</text><text x="492" y="164" font-size="10.5" fill="#4a4b4c">• dim_tipo_operacion (2)</text><text x="492" y="182" font-size="10.5" fill="#4a4b4c">• dim_fuente_datos (4)</text><rect x="492" y="200" width="140" height="28" rx="5" fill="#231f20"/><text x="562" y="218" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">FACT · 176.990</text><path d="M654 140 H694" stroke="#d8d4cb" stroke-width="1.5" marker-end="url(#fl)"/><rect x="698" y="92" width="76" height="96" rx="7" fill="#ffffff" stroke="#d8d4cb" stroke-width="1.5"/><text x="736" y="122" text-anchor="middle" font-size="11" font-weight="700" fill="#231f20">OLAP</text><text x="736" y="140" text-anchor="middle" font-size="9.5" fill="#4a4b4c">5 vistas</text><text x="736" y="155" text-anchor="middle" font-size="9.5" fill="#4a4b4c">4 KPI</text><text x="736" y="172" text-anchor="middle" font-size="9.5" fill="#8a8b8c">Metabase</text></svg>
+      <div class="cap"><b>Figura 1.</b> Arquitectura de extremo a extremo.</div></div>
+    <p>Cada libro del regulador contiene una hoja de presentaci&oacute;n, con subtotales embebidos,
+    y una hoja <code>BASE</code> en formato largo. El flujo lee la hoja <code>BASE</code>; la de
+    presentaci&oacute;n duplicar&iacute;a los importes al mezclar detalle con totales. El perfilado
+    previo registr&oacute; cero valores nulos y cero importes negativos, y verific&oacute; que la
+    identidad <code>TOTAL = POR VENCER + NO DEVENGA + VENCIDA</code> se cumple en las 54.773 filas
+    de cartera.</p>
+
+    <h2>3. Modelo dimensional</h2>
+    <p>El modelo unifica colocaciones y captaciones en una &uacute;nica tabla de hechos y emplea la
+    dimensi&oacute;n <code>dim_tipo_operacion</code> como eje discriminador, lo que permite
+    calcular indicadores que cruzan el activo y el pasivo de la entidad sin unir dos tablas de
+    hechos. El grano es un registro por mes de corte, entidad, cant&oacute;n y producto financiero;
+    corresponde a un <i>snapshot</i> peri&oacute;dico mensual, por lo que las m&eacute;tricas de
+    saldo son semiaditivas en el tiempo.</p>
+    <div class="fig"><svg viewBox="0 0 780 400" width="100%" role="img" aria-label="Modelo estrella: 6 dimensiones alrededor de la tabla de hechos"><path d="M381 44 L390.0 218.0" stroke="#d8d4cb" stroke-width="1.2" stroke-dasharray="3 3"/><path d="M123 130 L390.0 218.0" stroke="#d8d4cb" stroke-width="1.2" stroke-dasharray="3 3"/><path d="M657 130 L390.0 218.0" stroke="#d8d4cb" stroke-width="1.2" stroke-dasharray="3 3"/><path d="M123 270 L390.0 218.0" stroke="#d8d4cb" stroke-width="1.2" stroke-dasharray="3 3"/><path d="M657 270 L390.0 218.0" stroke="#d8d4cb" stroke-width="1.2" stroke-dasharray="3 3"/><path d="M381 356 L390.0 218.0" stroke="#d8d4cb" stroke-width="1.2" stroke-dasharray="3 3"/><rect x="280" y="10" width="202" height="68" rx="7" fill="#ffffff" stroke="#231f20" stroke-width="1.4"/><text x="294" y="33" font-size="12" font-weight="700" fill="#231f20">dim_tiempo</text><text x="294" y="50" font-size="10" fill="#4a4b4c">29 filas</text><text x="294" y="66" font-size="9.5" fill="#8a8b8c">Año>Sem>Trim>Mes</text><rect x="22" y="96" width="202" height="68" rx="7" fill="#ffffff" stroke="#231f20" stroke-width="1.4"/><text x="36" y="119" font-size="12" font-weight="700" fill="#231f20">dim_entidad</text><text x="36" y="136" font-size="10" fill="#4a4b4c">26 · SCD2</text><text x="36" y="152" font-size="9.5" fill="#8a8b8c">Tamaño>Perfil>Entidad</text><rect x="556" y="96" width="202" height="68" rx="7" fill="#ffffff" stroke="#231f20" stroke-width="1.4"/><text x="570" y="119" font-size="12" font-weight="700" fill="#231f20">dim_geografia</text><text x="570" y="136" font-size="10" fill="#4a4b4c">126 filas</text><text x="570" y="152" font-size="9.5" fill="#8a8b8c">Región>Prov>Cantón</text><rect x="22" y="236" width="202" height="68" rx="7" fill="#ffffff" stroke="#231f20" stroke-width="1.4"/><text x="36" y="259" font-size="12" font-weight="700" fill="#231f20">dim_producto</text><text x="36" y="276" font-size="10" fill="#4a4b4c">19 filas</text><text x="36" y="292" font-size="9.5" fill="#8a8b8c">Familia>Subfam>Prod</text><rect x="556" y="236" width="202" height="68" rx="7" fill="#ffffff" stroke="#231f20" stroke-width="1.4"/><text x="570" y="259" font-size="12" font-weight="700" fill="#231f20">dim_tipo_operacion</text><text x="570" y="276" font-size="10" fill="#4a4b4c">2 filas</text><text x="570" y="292" font-size="9.5" fill="#8a8b8c">Activo / Pasivo</text><rect x="280" y="322" width="202" height="68" rx="7" fill="#ffffff" stroke="#231f20" stroke-width="1.4"/><text x="294" y="345" font-size="12" font-weight="700" fill="#231f20">dim_fuente_datos</text><text x="294" y="362" font-size="10" fill="#4a4b4c">4 filas</text><text x="294" y="378" font-size="9.5" fill="#8a8b8c">Linaje ETL</text><rect x="268" y="158" width="244" height="120" rx="9" fill="#ed1c24"/><text x="390.0" y="188" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">fact_saldos_financieros</text><text x="390.0" y="210" text-anchor="middle" font-size="11.5" fill="#ffeee7">176.990 filas · 6 FK</text><text x="390.0" y="232" text-anchor="middle" font-size="10" fill="#ffeee7">saldo_total · por_vencer · vencido</text><text x="390.0" y="248" text-anchor="middle" font-size="10" fill="#ffeee7">improductivo · cuentas · clientes</text><text x="390.0" y="266" text-anchor="middle" font-size="9.5" fill="#ffdccd">grano: mes × entidad × cantón × producto</text></svg>
+      <div class="cap"><b>Figura 2.</b> Modelo estrella. Todas las claves primarias son
+      subrogadas.</div></div>
+    <p><b>Jerarqu&iacute;as:</b> tiempo (a&ntilde;o &rarr; semestre &rarr; trimestre &rarr; mes);
+    entidad (grupo de tama&ntilde;o &rarr; perfil de negocio &rarr; entidad); geograf&iacute;a
+    (regi&oacute;n &rarr; provincia &rarr; cant&oacute;n); producto (familia &rarr; subfamilia
+    &rarr; producto). Habilitan las operaciones de <i>drill-down</i>, <i>roll-up</i> y <i>slice and
+    dice</i>. La vista <code>dw.v_cubo_banca</code> expone el modelo desnormalizado y cuatro vistas
+    adicionales materializan los indicadores de negocio.</p>
+    <table><thead><tr><th>Objeto</th><th>Filas</th></tr></thead><tbody><tr><td class="">dim_tiempo</td><td class="n">29</td></tr><tr><td class="">dim_entidad</td><td class="n">26</td></tr><tr><td class="">dim_geografia</td><td class="n">126</td></tr><tr><td class="">dim_producto</td><td class="n">19</td></tr><tr><td class="">dim_tipo_operacion</td><td class="n">2</td></tr><tr><td class="">dim_fuente_datos</td><td class="n">4</td></tr><tr><td class="">fact_saldos_financieros</td><td class="n">176.990</td></tr></tbody></table>
+
+    <h2>4. Transformaci&oacute;n y limpieza</h2>
+    <p>El perfilado identific&oacute; seis incidencias en los archivos de origen.</p>
+    <table><thead><tr><th style="width:42%">Incidencia</th><th>Tratamiento</th></tr></thead><tbody>
+      <tr><td>Espacios dobles en la raz&oacute;n social
+        (<code>BP BANCO&nbsp;&nbsp;DESARROLLO&hellip;</code>)</td>
+        <td><code>regexReplace(strip(col), "\s+", " ")</code></td></tr>
+      <tr><td>Prefijos <code>BP</code> y <code>BANCO</code> y forma societaria <code>S.A.</code>
+        heterog&eacute;neos</td>
+        <td>Derivaci&oacute;n de un nombre comercial homog&eacute;neo, base de la clave
+        <code>cod_entidad</code></td></tr>
+      <tr><td>Diacr&iacute;ticos en <code>ATL&Aacute;NTIDA</code>, <code>CA&Ntilde;AR</code>,
+        <code>TS&Aacute;CHILAS</code></td>
+        <td>Normalizaci&oacute;n NFD en la clave; las tildes se conservan en el nombre de
+        presentaci&oacute;n</td></tr>
+      <tr><td>Los archivos de cartera no incluyen la columna <code>REGI&Oacute;N</code></td>
+        <td><i>Join</i> contra el cat&aacute;logo geogr&aacute;fico alojado en MySQL; la
+        dimensi&oacute;n se construye con dos fuentes</td></tr>
+      <tr><td><code>ZONA NO DELIMITADA / LAS GOLONDRINAS</code> sin regi&oacute;n asignable
+        (58 filas)</td>
+        <td>Miembro <code>NO DEFINIDA</code> y bandera <code>es_registro_desconocido</code>; los
+        importes permanecen en la tabla de hechos</td></tr>
+      <tr><td>Banco Amibank con dos razones sociales, activa y en liquidaci&oacute;n</td>
+        <td>Dimensi&oacute;n lentamente cambiante de tipo 2: una clave de negocio y dos versiones
+        con vigencia acotada</td></tr>
+    </tbody></table>
+    <table><thead><tr><th>Ver.</th><th>Nombre en el origen</th><th>Estado</th><th>Vigente desde</th><th>Vigente hasta</th></tr></thead><tbody><tr><td class="">1</td><td class="">BANCO AMIBANK S.A.</td><td class="">ACTIVA</td><td class="">2024-01-31</td><td class="">2025-01-30</td></tr><tr><td class="">2</td><td class="">BANCO AMIBANK S.A., EN LIQUIDACION</td><td class="">EN LIQUIDACION</td><td class="">2025-01-31</td><td class="">9999-12-31</td></tr></tbody></table>
+    <p>Durante la resoluci&oacute;n de claves subrogadas, cada hecho se asocia a la versi&oacute;n
+    vigente en su fecha de corte. Se derivan adem&aacute;s <code>saldo_improductivo</code> (cartera
+    que no devenga intereses m&aacute;s cartera vencida) y <code>saldo_promedio_cliente</code>
+    (saldo entre n&uacute;mero de clientes). El filtro de calidad descarta filas sin fecha, sin
+    entidad o con saldo negativo; el n&uacute;mero de filas descartadas es cero.</p>
+
+    <h2>5. Implementaci&oacute;n en KNIME</h2>
+    <p>El flujo <code>ETL_Banca_Ecuador.knwf</code> implementa el proceso con 122 nodos y 135
+    conexiones en quince tipos de nodo. Su ejecuci&oacute;n carga el modelo estrella en el esquema
+    <code>dw_knime</code>.</p>
+    <table><thead><tr><th>Bloque</th><th class="n">Nodos</th><th>Composici&oacute;n</th></tr></thead><tbody>
+      <tr><td><b>A. Extracci&oacute;n</b></td><td class="n">23</td><td>2 conectores de base de
+        datos, 7 lectores de consulta, 12 lectores de Excel y 1 lector de CSV</td></tr>
+      <tr><td><b>B. Transformaci&oacute;n</b></td><td class="n">30</td><td>25 <i>String
+        Manipulation</i>, 4 <i>Math Formula</i>, 4 <i>Rule Engine</i>, 4 <i>Rule-based Row
+        Filter</i> y 13 <i>Concatenate</i></td></tr>
+      <tr><td><b>C. Dimensiones</b></td><td class="n">20</td><td>Carga de las seis dimensiones;
+        <code>dim_tiempo</code> se deriva dentro del flujo</td></tr>
+      <tr><td><b>D. Hechos</b></td><td class="n">19</td><td>8 <i>Joiner</i> para la
+        sustituci&oacute;n de claves de negocio por subrogadas, incluida la resoluci&oacute;n
+        SCD-2</td></tr>
+    </tbody></table>
+
+    <h2>6. Validaci&oacute;n</h2>
+    <p>El script <code>etl/03_validacion.sql</code> ejecuta diez pruebas sobre el almac&eacute;n
+    cargado.</p>
+    <table><thead><tr><th style="width:46%">Prueba</th><th>Resultado</th></tr></thead><tbody>
+      <tr><td>Integridad referencial (6 claves for&aacute;neas)</td>
+          <td>Cero registros hu&eacute;rfanos</td></tr>
+      <tr><td>Conciliaci&oacute;n <code>staging</code> &harr; <code>dw</code></td>
+          <td>122.217 filas y USD 1.558.549 millones en ambos</td></tr>
+      <tr><td>Identidad contable TOTAL = POR VENCER + NO DEVENGA + VENCIDA</td>
+          <td>Cero filas la incumplen</td></tr>
+      <tr><td>Cobertura temporal</td><td>29 cortes mensuales consecutivos</td></tr>
+      <tr><td>Filas descartadas por el filtro de calidad</td><td>Cero</td></tr>
+      <tr><td>Conciliaci&oacute;n <code>dw</code> &harr; <code>dw_knime</code></td>
+          <td>Id&eacute;ntico n&uacute;mero de filas e importes en las siete tablas
+          (176.990 hechos)</td></tr>
+    </tbody></table>
+
+    <h2>7. Resultados del an&aacute;lisis</h2>
+    <p>Las captaciones registran una tasa de crecimiento superior a la de las colocaciones durante
+    todo el periodo, y la diferencia entre ambas series se ampl&iacute;a de forma sostenida.</p>
+    <div class="fig"><svg viewBox="0 0 760 308" width="100%" role="img" aria-label="Evolucion trimestral de captaciones y colocaciones"><line x1="62" x2="644" y1="249.1" y2="249.1" stroke="#e3ded4" stroke-width="1"/><text x="52" y="253.1" text-anchor="end" font-size="11" fill="#8a8b8c">40</text><line x1="62" x2="644" y1="207.0" y2="207.0" stroke="#e3ded4" stroke-width="1"/><text x="52" y="211.0" text-anchor="end" font-size="11" fill="#8a8b8c">45</text><line x1="62" x2="644" y1="164.9" y2="164.9" stroke="#e3ded4" stroke-width="1"/><text x="52" y="168.9" text-anchor="end" font-size="11" fill="#8a8b8c">50</text><line x1="62" x2="644" y1="122.7" y2="122.7" stroke="#e3ded4" stroke-width="1"/><text x="52" y="126.7" text-anchor="end" font-size="11" fill="#8a8b8c">55</text><line x1="62" x2="644" y1="80.6" y2="80.6" stroke="#e3ded4" stroke-width="1"/><text x="52" y="84.6" text-anchor="end" font-size="11" fill="#8a8b8c">60</text><line x1="62" x2="644" y1="38.4" y2="38.4" stroke="#e3ded4" stroke-width="1"/><text x="52" y="42.4" text-anchor="end" font-size="11" fill="#8a8b8c">65</text><text x="62.0" y="288" text-anchor="middle" font-size="10.5" fill="#8a8b8c">2024-T1</text><text x="134.8" y="288" text-anchor="middle" font-size="10.5" fill="#8a8b8c">2024-T2</text><text x="207.5" y="288" text-anchor="middle" font-size="10.5" fill="#8a8b8c">2024-T3</text><text x="280.2" y="288" text-anchor="middle" font-size="10.5" fill="#8a8b8c">2024-T4</text><text x="353.0" y="288" text-anchor="middle" font-size="10.5" fill="#8a8b8c">2025-T1</text><text x="425.8" y="288" text-anchor="middle" font-size="10.5" fill="#8a8b8c">2025-T2</text><text x="498.5" y="288" text-anchor="middle" font-size="10.5" fill="#8a8b8c">2025-T3</text><text x="571.2" y="288" text-anchor="middle" font-size="10.5" fill="#8a8b8c">2025-T4</text><text x="644.0" y="288" text-anchor="middle" font-size="10.5" fill="#8a8b8c">2026-T1</text><polyline points="62.0,201.2 134.8,184.1 207.5,169.9 280.2,142.9 353.0,128.1 425.8,112.2 498.5,104.0 571.2,79.5 644.0,63.5" fill="none" stroke="#231f20" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="62.0" cy="201.2" r="4" fill="#231f20" stroke="#ffffff" stroke-width="2"/><circle cx="134.8" cy="184.1" r="4" fill="#231f20" stroke="#ffffff" stroke-width="2"/><circle cx="207.5" cy="169.9" r="4" fill="#231f20" stroke="#ffffff" stroke-width="2"/><circle cx="280.2" cy="142.9" r="4" fill="#231f20" stroke="#ffffff" stroke-width="2"/><circle cx="353.0" cy="128.1" r="4" fill="#231f20" stroke="#ffffff" stroke-width="2"/><circle cx="425.8" cy="112.2" r="4" fill="#231f20" stroke="#ffffff" stroke-width="2"/><circle cx="498.5" cy="104.0" r="4" fill="#231f20" stroke="#ffffff" stroke-width="2"/><circle cx="571.2" cy="79.5" r="4" fill="#231f20" stroke="#ffffff" stroke-width="2"/><circle cx="644.0" cy="63.5" r="4" fill="#231f20" stroke="#ffffff" stroke-width="2"/><text x="657.0" y="65.5" font-size="11.5" font-weight="700" fill="#231f20">Captaciones</text><text x="657.0" y="80.5" font-size="11" fill="#4a4b4c">62,0</text><polyline points="62.0,227.6 134.8,219.9 207.5,212.1 280.2,200.5 353.0,190.7 425.8,182.1 498.5,170.9 571.2,153.5 644.0,139.1" fill="none" stroke="#ed1c24" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="62.0" cy="227.6" r="4" fill="#ed1c24" stroke="#ffffff" stroke-width="2"/><circle cx="134.8" cy="219.9" r="4" fill="#ed1c24" stroke="#ffffff" stroke-width="2"/><circle cx="207.5" cy="212.1" r="4" fill="#ed1c24" stroke="#ffffff" stroke-width="2"/><circle cx="280.2" cy="200.5" r="4" fill="#ed1c24" stroke="#ffffff" stroke-width="2"/><circle cx="353.0" cy="190.7" r="4" fill="#ed1c24" stroke="#ffffff" stroke-width="2"/><circle cx="425.8" cy="182.1" r="4" fill="#ed1c24" stroke="#ffffff" stroke-width="2"/><circle cx="498.5" cy="170.9" r="4" fill="#ed1c24" stroke="#ffffff" stroke-width="2"/><circle cx="571.2" cy="153.5" r="4" fill="#ed1c24" stroke="#ffffff" stroke-width="2"/><circle cx="644.0" cy="139.1" r="4" fill="#ed1c24" stroke="#ffffff" stroke-width="2"/><text x="657.0" y="141.1" font-size="11.5" font-weight="700" fill="#231f20">Colocaciones</text><text x="657.0" y="156.1" font-size="11" fill="#4a4b4c">53,1</text><text x="6" y="14" font-size="10" fill="#8a8b8c">miles de millones de USD</text></svg>
+      <div class="cap"><b>Figura 3.</b> Saldos trimestrales del sistema, en miles de millones de
+      d&oacute;lares. Cortes de fin de trimestre.</div></div>
+    <p>El &iacute;ndice de morosidad del sistema se mantiene estable (2024: 3,57 % · 2025: 3,18 % · 2026: 3,16 %). La
+    dispersi&oacute;n entre segmentos es amplia: el microcr&eacute;dito registra un &iacute;ndice
+    seis veces superior al del cr&eacute;dito productivo. Cuatro entidades concentran el 66,9 % de
+    las captaciones; la clasificaci&oacute;n por tama&ntilde;o se deriva de los propios datos
+    mediante un criterio de Pareto sobre el volumen acumulado.</p>
+    <div class="fig"><svg viewBox="0 0 760 250" width="100%" role="img" aria-label="Indice de morosidad por segmento de credito, 2026"><line x1="210.0" x2="210.0" y1="8" y2="210" stroke="#e3ded4" stroke-width="1"/><text x="210.0" y="230" text-anchor="middle" font-size="10.5" fill="#8a8b8c">0%</text><line x1="335.9" x2="335.9" y1="8" y2="210" stroke="#e3ded4" stroke-width="1"/><text x="335.9" y="230" text-anchor="middle" font-size="10.5" fill="#8a8b8c">2%</text><line x1="461.7" x2="461.7" y1="8" y2="210" stroke="#e3ded4" stroke-width="1"/><text x="461.7" y="230" text-anchor="middle" font-size="10.5" fill="#8a8b8c">4%</text><line x1="587.6" x2="587.6" y1="8" y2="210" stroke="#e3ded4" stroke-width="1"/><text x="587.6" y="230" text-anchor="middle" font-size="10.5" fill="#8a8b8c">6%</text><text x="196" y="27" text-anchor="end" font-size="11.5" fill="#231f20">Microcrédito</text><path d="M210 14 H623.8 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 H210 Z" fill="#ed1c24"/><text x="637.8" y="27" font-size="11.5" font-weight="600" fill="#231f20">6,64 %</text><text x="196" y="61" text-anchor="end" font-size="11.5" fill="#231f20">Vivienda de interés público</text><path d="M210 48 H575.3 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 H210 Z" fill="#ed1c24"/><text x="589.3" y="61" font-size="11.5" font-weight="600" fill="#231f20">5,87 %</text><text x="196" y="95" text-anchor="end" font-size="11.5" fill="#231f20">Educativo</text><path d="M210 82 H543.6 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 H210 Z" fill="#ed1c24"/><text x="557.6" y="95" font-size="11.5" font-weight="600" fill="#231f20">5,36 %</text><text x="196" y="129" text-anchor="end" font-size="11.5" fill="#231f20">Consumo</text><path d="M210 116 H517.5 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 H210 Z" fill="#ed1c24"/><text x="531.5" y="129" font-size="11.5" font-weight="600" fill="#231f20">4,95 %</text><text x="196" y="163" text-anchor="end" font-size="11.5" fill="#231f20">Inmobiliario</text><path d="M210 150 H395.5 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 H210 Z" fill="#ed1c24"/><text x="409.5" y="163" font-size="11.5" font-weight="600" fill="#231f20">3,01 %</text><text x="196" y="197" text-anchor="end" font-size="11.5" fill="#231f20">Productivo</text><path d="M210 184 H275.7 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 H210 Z" fill="#ed1c24"/><text x="289.7" y="197" font-size="11.5" font-weight="600" fill="#231f20">1,11 %</text></svg>
+      <div class="cap"><b>Figura 4.</b> Cartera improductiva sobre cartera bruta por segmento,
+      2026.</div></div>
+    <table><thead><tr><th>Grupo</th><th>Bancos</th><th>Mercado</th></tr></thead><tbody><tr><td class="">GRANDE</td><td class="n">4</td><td class="n">66,9 %</td></tr><tr><td class="">MEDIANO</td><td class="n">3</td><td class="n">20,6 %</td></tr><tr><td class="">PEQUEÑO</td><td class="n">16</td><td class="n">12,5 %</td></tr></tbody></table>
+
+    <h2>8. Conclusiones</h2>
+    <ol>
+      <li>El flujo integra cuatro tecnolog&iacute;as de origen distintas en un modelo estrella
+      &uacute;nico y carga 176.990 registros de hechos.</li>
+      <li>La normalizaci&oacute;n de claves y la historificaci&oacute;n SCD-2 consolidan 26 razones
+      sociales en 25 entidades con 26 versiones, lo que preserva la continuidad de las series
+      hist&oacute;ricas.</li>
+      <li>La dimensi&oacute;n geogr&aacute;fica se completa con datos de dos fuentes, dado que
+      ninguna contiene la totalidad de los atributos.</li>
+      <li>Las implementaciones en KNIME y en Python producen resultados id&eacute;nticos, y la
+      contenerizaci&oacute;n permite reproducir el proceso en cualquier equipo con Docker.</li>
+    </ol>
+
+    </body></html>
