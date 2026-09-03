@@ -1,0 +1,33 @@
+# =====================================================================
+# Declaracion de los 5 pipelines
+# ---------------------------------------------------------------------
+#   BATCH            -> carga masiva historica, se ejecuta y termina
+#   NEAR REAL-TIME   -> permanece a la escucha, latencia de segundos
+# =====================================================================
+
+# ---------- BATCH ----------
+- pipeline.id: b1-pg-hechos
+  path.config: "/usr/share/logstash/pipeline/10_batch_pg_hechos.conf"
+  pipeline.workers: 2
+
+- pipeline.id: b2-mysql-catalogos
+  path.config: "/usr/share/logstash/pipeline/11_batch_mysql_catalogos.conf"
+  pipeline.workers: 1
+
+- pipeline.id: b3-csv-colocaciones
+  path.config: "/usr/share/logstash/pipeline/12_batch_csv_colocaciones.conf"
+  pipeline.workers: 1
+
+# ---------- NEAR REAL-TIME ----------
+- pipeline.id: n1-beats-transacciones
+  path.config: "/usr/share/logstash/pipeline/20_nrt_beats_transacciones.conf"
+  pipeline.workers: 2
+  queue.type: persisted
+  # Lote corto: el ajuste global (1000) tardaria 50 s en llenarse a 20
+  # eventos por segundo y esa espera se sumaria a la latencia de ingesta.
+  pipeline.batch.size: 50
+  pipeline.batch.delay: 20
+
+- pipeline.id: n2-jdbc-bitacora
+  path.config: "/usr/share/logstash/pipeline/21_nrt_jdbc_bitacora.conf"
+  pipeline.workers: 1

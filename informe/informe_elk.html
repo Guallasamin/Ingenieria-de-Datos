@@ -1,0 +1,389 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>Informe técnico · Flujo ELK mixto</title><style>
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700&family=Arimo:ital,wght@0,400;0,500;0,600;0,700&display=swap');
+@page { size: A4; margin: 20mm 18mm 18mm 18mm;
+        @bottom-center { content: counter(page) " de " counter(pages);
+                         font-size: 8.5pt; color: #8a8b8c; } }
+@page :first { margin-top: 0; }
+* { box-sizing: border-box; }
+body { font-family: Helvetica, "Helvetica Neue", Arimo, Arial, sans-serif;
+       font-size: 9.7pt; line-height: 1.52; color: #231f20; margin: 0; }
+h1, h2, h3, .display { font-family: Baskerville, "Baskerville Old Face",
+       "Libre Baskerville", "Hoefler Text", Garamond, "Times New Roman", serif; }
+h1 { font-size: 22pt; margin: 0 0 6pt; font-weight: 700; line-height: 1.15; }
+h2 { font-size: 14pt; font-weight: 700; margin: 18pt 0 8pt; padding-bottom: 4pt;
+     border-bottom: 1.5pt solid #ed1c24; page-break-after: avoid; }
+h3 { font-size: 11pt; font-weight: 700; margin: 13pt 0 5pt;
+     page-break-after: avoid; }
+p  { margin: 0 0 7pt; text-align: justify; }
+.portada { background: #231f20; color: #fff; padding: 22mm 18mm 14mm;
+           margin: 0 0 14pt; }
+.portada .filete { width: 46mm; height: 3pt; background: #ed1c24;
+                   margin-bottom: 12pt; }
+.portada h1 { color: #fff; font-size: 25pt; }
+.portada .sub { font-size: 11.5pt; margin-top: 8pt; color: #d8d4cb;
+                font-family: Helvetica, Arimo, Arial, sans-serif; }
+.portada .meta { font-size: 9pt; color: #d8d4cb; margin-top: 18pt;
+                 border-top: 0.5pt solid #4a4b4c; padding-top: 10pt; }
+.portada .meta b { color: #fff; }
+table { width: 100%; border-collapse: collapse; margin: 7pt 0 11pt;
+        font-size: 8.6pt; page-break-inside: avoid; }
+th { background: #faf3e9; text-align: left; padding: 5pt 7pt; font-weight: 700;
+     border-top: 0.8pt solid #231f20; border-bottom: 0.8pt solid #d8d4cb; }
+td { padding: 4.5pt 7pt; border-bottom: 0.4pt solid #e3ded4;
+     vertical-align: top; }
+td.n { text-align: right; font-variant-numeric: tabular-nums; }
+table.retos { font-size: 8.3pt; page-break-inside: auto; }
+table.retos td { width: 50%; }
+table.retos .det { color: #4a4b4c; margin-top: 3pt; }
+table.retos .sol { background: #faf3e9; }
+table.retos tr { page-break-inside: avoid; }
+.kpis { display: flex; gap: 7pt; margin: 10pt 0 12pt; }
+.kpi { flex: 1 1 0; min-width: 0; border: 0.5pt solid #d8d4cb;
+       border-top: 2.5pt solid #ed1c24; padding: 8pt 8pt; }
+.kpi .v { font-family: Baskerville, "Libre Baskerville", Garamond, serif;
+          font-size: 15.5pt; font-weight: 700; line-height: 1;
+          white-space: nowrap; }
+.kpi .l { font-size: 7.6pt; color: #4a4b4c; margin-top: 3pt; line-height: 1.3; }
+.fig { margin: 8pt 0 11pt; page-break-inside: avoid; }
+.fig svg { display: block; margin: 0 auto; max-width: 100%; }
+.fig.mini svg { max-width: 82%; }
+.fig .cap { font-size: 8pt; color: #4a4b4c; margin-top: 4pt; }
+.fig .cap b { color: #231f20; }
+.nota { background: #faf3e9; border-left: 2.5pt solid #ed1c24;
+        padding: 7pt 10pt; margin: 9pt 0 12pt; font-size: 8.7pt; }
+code { font-family: "Courier New", Consolas, monospace; font-size: 8.4pt;
+       background: #faf3e9; padding: 0.5pt 3pt; }
+pre { background: #faf3e9; border-left: 2.5pt solid #d8d4cb; padding: 8pt 10pt;
+      font-family: "Courier New", Consolas, monospace; font-size: 7.8pt;
+      line-height: 1.45; white-space: pre-wrap; page-break-inside: avoid;
+      margin: 0 0 10pt; }
+ul, ol { margin: 0 0 8pt; padding-left: 15pt; }
+li { margin-bottom: 3.5pt; }
+.salto { page-break-before: always; }
+.dos { display: flex; gap: 12pt; }
+.dos > div { flex: 1; }
+</style></head><body>
+
+<div class="portada">
+  <div class="filete"></div>
+  <div style="font-size:9pt;letter-spacing:.08em;color:#d8d4cb">
+    UNIVERSIDAD SAN FRANCISCO DE QUITO &nbsp;·&nbsp; INGENIERÍA DE DATOS</div>
+  <h1>Flujo ELK mixto:<br>ingesta en lote y en near real-time
+      sobre el sistema de banca privada del Ecuador</h1>
+  <div class="sub">Informe técnico · Taller de la semana 2</div>
+  <div class="meta">
+    <b>Arquitectura:</b> Elasticsearch 8.15.3 · Logstash 8.15.3 ·
+    Kibana 8.15.3 · Filebeat 8.15.3, sobre Docker Compose<br>
+    <b>Fuentes integradas:</b> cinco &mdash; tres en lote y dos en near
+    real-time &nbsp;·&nbsp; <b>Fecha:</b> 03/09/2026
+  </div>
+</div>
+
+<h2>1. Objeto y alcance</h2>
+<p>Se disena e implementa un flujo de ingesta sobre la pila ELK que combina
+los dos esquemas de procesamiento en una sola arquitectura: un
+<b>esquema en lote</b> que traslada a Elasticsearch el Data Warehouse
+dimensional construido en el taller anterior, y un <b>esquema near
+real-time</b> que ingiere un flujo continuo de transacciones con latencia
+de segundos. En total se integran <b>cinco fuentes de datos</b> sobre tres
+tecnologias de origen distintas &mdash; PostgreSQL, MySQL y ficheros
+planos &mdash; y dos mecanismos de transporte opuestos: uno que empuja el
+dato y otro que lo pregunta.</p>
+<p>La totalidad de la infraestructura se declara en Docker Compose y se
+levanta con un unico perfil, de modo que el flujo es reproducible en
+cualquier equipo sin instalar nada en el sistema anfitrion.</p>
+
+<div class="kpis">
+  <div class="kpi"><div class="v">5</div>
+    <div class="l">Fuentes integradas<br>(3 lote + 2 near real-time)</div></div>
+  <div class="kpi"><div class="v">189.003</div>
+    <div class="l">Documentos indexados<br>en Elasticsearch</div></div>
+  <div class="kpi"><div class="v">1.099 ms</div>
+    <div class="l">Latencia p95 del canal<br>near real-time</div></div>
+  <div class="kpi"><div class="v">2,55 GiB</div>
+    <div class="l">Memoria de los 8<br>contenedores en marcha</div></div>
+</div>
+
+<h2>2. Arquitectura implementada</h2>
+<p>La arquitectura se organiza en dos carriles que comparten destino. El
+carril superior es el de lote: tres pipelines leen el almacen dimensional,
+los catalogos maestros y un fichero delimitado, y terminan cuando agotan su
+origen. El carril inferior es el near real-time: permanece a la escucha de
+forma indefinida y entrega cada evento en cuestion de segundos.</p>
+
+<div class="fig"><svg viewBox="0 0 900 470" width="100%" role="img" aria-label="Arquitectura del flujo ELK mixto: tres fuentes en lote y dos en near real-time"><rect x="0" y="30" width="900" height="188" fill="#faf3e9" opacity="0.55"/><text x="6" y="24" font-size="10" font-weight="700" fill="#4a4b4c">ESQUEMA BATCH · carga masiva histórica</text><text x="6" y="248" font-size="10" font-weight="700" fill="#ed1c24">ESQUEMA NEAR REAL-TIME · latencia de segundos</text><rect x="6" y="36" width="176" height="54" rx="3" fill="#ffffff" stroke="#d8d4cb" stroke-width="1"/><rect x="6" y="36" width="176" height="2.5" rx="1" fill="#231f20"/><text x="16" y="55" text-anchor="start" font-size="11" font-weight="700" fill="#231f20">B1 · PostgreSQL</text><text x="16" y="70.0" text-anchor="start" font-size="9.5" fill="#4a4b4c">dw.fact + 6 dimensiones</text><text x="16" y="82.5" text-anchor="start" font-size="9.5" fill="#4a4b4c">176.990 filas</text><rect x="6" y="96" width="176" height="54" rx="3" fill="#ffffff" stroke="#d8d4cb" stroke-width="1"/><rect x="6" y="96" width="176" height="2.5" rx="1" fill="#231f20"/><text x="16" y="115" text-anchor="start" font-size="11" font-weight="700" fill="#231f20">B2 · MySQL</text><text x="16" y="130.0" text-anchor="start" font-size="9.5" fill="#4a4b4c">catalogos_sb · 2 catálogos</text><text x="16" y="142.5" text-anchor="start" font-size="9.5" fill="#4a4b4c">152 filas</text><rect x="6" y="156" width="176" height="54" rx="3" fill="#ffffff" stroke="#d8d4cb" stroke-width="1"/><rect x="6" y="156" width="176" height="2.5" rx="1" fill="#231f20"/><text x="16" y="175" text-anchor="start" font-size="11" font-weight="700" fill="#231f20">B3 · CSV</text><text x="16" y="190.0" text-anchor="start" font-size="9.5" fill="#4a4b4c">colocaciones_2026.csv</text><text x="16" y="202.5" text-anchor="start" font-size="9.5" fill="#4a4b4c">9.432 filas</text><rect x="6" y="258" width="176" height="54" rx="3" fill="#ffffff" stroke="#d8d4cb" stroke-width="1"/><rect x="6" y="258" width="176" height="2.5" rx="1" fill="#ed1c24"/><text x="16" y="277" text-anchor="start" font-size="11" font-weight="700" fill="#231f20">N1 · Flujo NDJSON</text><text x="16" y="292.0" text-anchor="start" font-size="9.5" fill="#4a4b4c">transacciones.ndjson</text><text x="16" y="304.5" text-anchor="start" font-size="9.5" fill="#4a4b4c">escritura continua</text><rect x="6" y="318" width="176" height="54" rx="3" fill="#ffffff" stroke="#d8d4cb" stroke-width="1"/><rect x="6" y="318" width="176" height="2.5" rx="1" fill="#ed1c24"/><text x="16" y="337" text-anchor="start" font-size="11" font-weight="700" fill="#231f20">N2 · PostgreSQL</text><text x="16" y="352.0" text-anchor="start" font-size="9.5" fill="#4a4b4c">staging.etl_bitacora</text><text x="16" y="364.5" text-anchor="start" font-size="9.5" fill="#4a4b4c">sondeo incremental 15 s</text><rect x="212" y="258" width="118" height="54" rx="3" fill="#ffffff" stroke="#d8d4cb" stroke-width="1"/><rect x="212" y="258" width="118" height="2.5" rx="1" fill="#ed1c24"/><text x="222" y="277" text-anchor="start" font-size="11" font-weight="700" fill="#231f20">Filebeat</text><text x="222" y="292.0" text-anchor="start" font-size="9.5" fill="#4a4b4c">tail del fichero</text><text x="222" y="304.5" text-anchor="start" font-size="9.5" fill="#4a4b4c">empuja (push)</text><text x="271" y="336" text-anchor="middle" font-size="9" fill="#8a8b8c">JDBC pregunta (pull)</text><rect x="360" y="36" width="196" height="336" rx="3" fill="#ffffff" stroke="#231f20" stroke-width="1.4"/><text x="458" y="56" text-anchor="middle" font-size="12" font-weight="700" fill="#231f20">Logstash</text><text x="458" y="70" text-anchor="middle" font-size="9" fill="#4a4b4c">5 pipelines aislados</text><rect x="372" y="84" width="172" height="46" rx="2" fill="#faf3e9" stroke="#d8d4cb"/><rect x="372" y="84" width="2.5" height="46" fill="#231f20"/><text x="382" y="101" font-size="9.5" font-weight="700" fill="#231f20">b1-pg-hechos</text><text x="382" y="116" font-size="8.5" fill="#4a4b4c">jdbc · paginado 20k</text><rect x="372" y="140" width="172" height="46" rx="2" fill="#faf3e9" stroke="#d8d4cb"/><rect x="372" y="140" width="2.5" height="46" fill="#231f20"/><text x="382" y="157" font-size="9.5" font-weight="700" fill="#231f20">b2-mysql-catalogos</text><text x="382" y="172" font-size="8.5" fill="#4a4b4c">jdbc · 2 entradas</text><rect x="372" y="196" width="172" height="46" rx="2" fill="#faf3e9" stroke="#d8d4cb"/><rect x="372" y="196" width="2.5" height="46" fill="#231f20"/><text x="382" y="213" font-size="9.5" font-weight="700" fill="#231f20">b3-csv-colocaciones</text><text x="382" y="228" font-size="8.5" fill="#4a4b4c">file · modo read</text><rect x="372" y="252" width="172" height="46" rx="2" fill="#faf3e9" stroke="#d8d4cb"/><rect x="372" y="252" width="2.5" height="46" fill="#ed1c24"/><text x="382" y="269" font-size="9.5" font-weight="700" fill="#231f20">n1-beats-transacciones</text><text x="382" y="284" font-size="8.5" fill="#4a4b4c">beats · 5044</text><rect x="372" y="308" width="172" height="46" rx="2" fill="#faf3e9" stroke="#d8d4cb"/><rect x="372" y="308" width="2.5" height="46" fill="#ed1c24"/><text x="382" y="325" font-size="9.5" font-weight="700" fill="#231f20">n2-jdbc-bitacora</text><text x="382" y="340" font-size="8.5" fill="#4a4b4c">jdbc · marca de agua</text><rect x="586" y="36" width="190" height="336" rx="3" fill="#ffffff" stroke="#d8d4cb" stroke-width="1"/><rect x="586" y="36" width="190" height="2.5" rx="1" fill="#231f20"/><text x="596" y="55" text-anchor="start" font-size="11" font-weight="700" fill="#231f20">Elasticsearch</text><text x="596" y="34" font-size="9" fill="#8a8b8c"></text><rect x="598" y="62" width="166" height="42" rx="2" fill="#ffffff" stroke="#d8d4cb"/><rect x="598" y="62" width="2.5" height="42" fill="#231f20"/><text x="608" y="78" font-size="9" font-weight="700" fill="#231f20">banca-hechos</text><text x="608" y="93" font-size="8.5" fill="#4a4b4c">176.990 documentos</text><rect x="598" y="114" width="166" height="42" rx="2" fill="#ffffff" stroke="#d8d4cb"/><rect x="598" y="114" width="2.5" height="42" fill="#231f20"/><text x="608" y="130" font-size="9" font-weight="700" fill="#231f20">banca-catalogo-entidad</text><text x="608" y="145" font-size="8.5" fill="#4a4b4c">26 documentos</text><rect x="598" y="166" width="166" height="42" rx="2" fill="#ffffff" stroke="#d8d4cb"/><rect x="598" y="166" width="2.5" height="42" fill="#231f20"/><text x="608" y="182" font-size="9" font-weight="700" fill="#231f20">banca-catalogo-geografia</text><text x="608" y="197" font-size="8.5" fill="#4a4b4c">126 documentos</text><rect x="598" y="218" width="166" height="42" rx="2" fill="#ffffff" stroke="#d8d4cb"/><rect x="598" y="218" width="2.5" height="42" fill="#231f20"/><text x="608" y="234" font-size="9" font-weight="700" fill="#231f20">banca-colocaciones-2026</text><text x="608" y="249" font-size="8.5" fill="#4a4b4c">9.432 documentos</text><rect x="598" y="270" width="166" height="42" rx="2" fill="#ffffff" stroke="#d8d4cb"/><rect x="598" y="270" width="2.5" height="42" fill="#ed1c24"/><text x="608" y="286" font-size="9" font-weight="700" fill="#231f20">banca-transacciones</text><text x="608" y="301" font-size="8.5" fill="#4a4b4c">2.400 documentos</text><rect x="598" y="322" width="166" height="42" rx="2" fill="#ffffff" stroke="#d8d4cb"/><rect x="598" y="322" width="2.5" height="42" fill="#ed1c24"/><text x="608" y="338" font-size="9" font-weight="700" fill="#231f20">banca-bitacora-etl</text><text x="608" y="353" font-size="8.5" fill="#4a4b4c">29 documentos</text><rect x="806" y="150" width="88" height="108" rx="3" fill="#ffffff" stroke="#d8d4cb" stroke-width="1"/><rect x="806" y="150" width="88" height="2.5" rx="1" fill="#231f20"/><text x="816" y="169" text-anchor="start" font-size="11" font-weight="700" fill="#231f20">Kibana</text><text x="816" y="184.0" text-anchor="start" font-size="9.5" fill="#4a4b4c">6 vistas</text><text x="816" y="196.5" text-anchor="start" font-size="9.5" fill="#4a4b4c">de datos</text><text x="816" y="209.0" text-anchor="start" font-size="9.5" fill="#4a4b4c"></text><text x="816" y="221.5" text-anchor="start" font-size="9.5" fill="#4a4b4c">1 tablero</text><text x="816" y="234.0" text-anchor="start" font-size="9.5" fill="#4a4b4c">4 paneles</text><line x1="182" y1="63" x2="353" y2="63" stroke="#8a8b8c" stroke-width="1.2"/><path d="M353,59.5 L360,63 L353,66.5 Z" fill="#8a8b8c"/><line x1="182" y1="123" x2="353" y2="123" stroke="#8a8b8c" stroke-width="1.2"/><path d="M353,119.5 L360,123 L353,126.5 Z" fill="#8a8b8c"/><line x1="182" y1="183" x2="353" y2="183" stroke="#8a8b8c" stroke-width="1.2"/><path d="M353,179.5 L360,183 L353,186.5 Z" fill="#8a8b8c"/><line x1="182" y1="285" x2="205" y2="285" stroke="#8a8b8c" stroke-width="1.2"/><path d="M205,281.5 L212,285 L205,288.5 Z" fill="#8a8b8c"/><line x1="330" y1="285" x2="353" y2="285" stroke="#8a8b8c" stroke-width="1.2"/><path d="M353,281.5 L360,285 L353,288.5 Z" fill="#8a8b8c"/><line x1="182" y1="345" x2="353" y2="345" stroke="#8a8b8c" stroke-width="1.2" stroke-dasharray="4 3"/><path d="M353,341.5 L360,345 L353,348.5 Z" fill="#8a8b8c"/><line x1="556" y1="204" x2="579" y2="204" stroke="#8a8b8c" stroke-width="1.2"/><path d="M579,200.5 L586,204 L579,207.5 Z" fill="#8a8b8c"/><line x1="776" y1="204" x2="799" y2="204" stroke="#8a8b8c" stroke-width="1.2"/><path d="M799,200.5 L806,204 L799,207.5 Z" fill="#8a8b8c"/></svg>
+  <div class="cap"><b>Figura 1.</b> Flujo mixto de extremo a extremo. En rojo,
+  los componentes del carril near real-time; la flecha discontinua representa
+  el sondeo incremental, que pregunta en lugar de recibir.</div>
+</div>
+
+<h3>2.1 Las cinco fuentes y su destino</h3>
+<table>
+  <thead><tr><th>Flujo</th><th>Origen</th><th>Esquema</th>
+    <th>Índice o flujo de datos</th><th>Documentos</th></tr></thead>
+  <tbody><tr><td><b>B1</b></td><td>PostgreSQL · DW</td><td>Lote</td><td><code>banca-hechos</code></td><td class="n">176.990</td></tr><tr><td><b>B2</b></td><td>MySQL · entidades</td><td>Lote</td><td><code>banca-catalogo-entidad</code></td><td class="n">26</td></tr><tr><td><b>B2</b></td><td>MySQL · geografía</td><td>Lote</td><td><code>banca-catalogo-geografia</code></td><td class="n">126</td></tr><tr><td><b>B3</b></td><td>CSV</td><td>Lote</td><td><code>banca-colocaciones-2026</code></td><td class="n">9.432</td></tr><tr><td><b>N1</b></td><td>NDJSON → Filebeat</td><td>Near real-time</td><td><code>banca-transacciones</code></td><td class="n">2.400</td></tr><tr><td><b>N2</b></td><td>PostgreSQL incremental</td><td>Near real-time</td><td><code>banca-bitacora-etl</code></td><td class="n">29</td></tr>
+    <tr><th>Total</th><th></th><th></th><th></th>
+        <th class="n">189.003</th></tr>
+  </tbody>
+</table>
+
+<h2>3. El carril en lote</h2>
+<p>Los tres pipelines en lote resuelven el traslado de un modelo relacional
+a un motor documental. El paso clave es la <b>desnormalizacion</b>:
+Elasticsearch no ejecuta uniones entre indices, de modo que la consulta de
+extraccion une la tabla de hechos con sus seis dimensiones y produce un
+documento autocontenido con las veintiseis dimensiones de analisis y las
+ocho metricas de cada registro.</p>
+<ul>
+  <li><b>B1 &mdash; PostgreSQL.</b> Recupera los 176.990
+    hechos del almacen con paginacion de 20.000 filas; sin ella, el
+    controlador cargaria el resultado completo en la memoria de Logstash. La clave subrogada <code>saldo_sk</code> se usa como
+    identificador del documento.</li>
+  <li><b>B2 &mdash; MySQL.</b> Dos entradas en un mismo pipeline, separadas
+    por el campo <code>type</code> y encaminadas a indices distintos en la
+    salida. El catalogo de entidades conserva las versiones de la dimension
+    lentamente cambiante, con una clave compuesta
+    <code>cod_entidad-vN</code>.</li>
+  <li><b>B3 &mdash; CSV.</b> Lector en modo <code>read</code>, que procesa el
+    fichero completo y termina, frente al modo <code>tail</code> que emplea
+    el carril near real-time. Aplica la misma normalizacion de razones
+    sociales que el flujo del taller anterior.</li>
+</ul>
+<div class="nota"><b>Conciliacion con el origen.</b> La suma de
+<code>saldo_total</code> agregada por Elasticsearch asciende a
+USD 2.926.925,37 millones, cifra identica a la que devuelve
+PostgreSQL sobre la tabla de hechos. El traslado no altera ningun importe.</div>
+
+<h2>4. El carril near real-time</h2>
+<p>El regulador publica boletines mensuales, por lo que no existe un flujo
+transaccional publico que se pueda consumir en vivo. Para ejercitar el
+esquema se genera el evento que falta, pero <b>sin inventar el maestro</b>:
+las entidades, provincias y cantones se leen de los catalogos reales ya
+cargados en MySQL, de modo que el canal en vivo es consistente con el
+historico y ambos se pueden cruzar en la misma consulta.</p>
+<p>Se implementaron los dos mecanismos de ingesta continua, que son
+opuestos por diseno:</p>
+<table>
+  <thead><tr><th></th><th>N1 &mdash; empuje (<i>push</i>)</th>
+    <th>N2 &mdash; sondeo (<i>pull</i>)</th></tr></thead>
+  <tbody>
+    <tr><td><b>Origen</b></td><td>Fichero NDJSON en crecimiento</td>
+        <td>Tabla <code>staging.etl_bitacora</code></td></tr>
+    <tr><td><b>Transporte</b></td><td>Filebeat sigue el fichero y empuja a
+        Logstash por el puerto 5044</td>
+        <td>Logstash consulta por JDBC cada 15 segundos</td></tr>
+    <tr><td><b>Control de avance</b></td>
+        <td>Registro de posicion en el fichero</td>
+        <td>Marca de agua sobre <code>id_ejecucion</code>, guardada en disco</td></tr>
+    <tr><td><b>Latencia</b></td>
+        <td>p50 645 ms · p95 1.099 ms</td>
+        <td>Hasta 15 s, fijada por el intervalo de sondeo</td></tr>
+    <tr><td><b>Uso</b></td><td>Eventos de negocio</td>
+        <td>Observabilidad del propio proceso de carga</td></tr>
+  </tbody>
+</table>
+
+<h3>4.1 Enriquecimiento en vuelo</h3>
+<p>Es el punto donde los dos carriles se encuentran. Las transacciones no
+traen el grupo de tamano de la entidad; el pipeline lo resuelve contra un
+diccionario materializado desde el mismo catalogo de MySQL que alimenta el
+flujo en lote, con lo que cada evento llega al indice ya clasificado. La
+resolucion es <b>en memoria</b> y no por consulta: la seccion 9 explica por
+que la primera version, que preguntaba a Elasticsearch una vez por evento,
+hubo que descartarla. Se evaluan ademas dos reglas de negocio en
+linea: se marca con <code>MONTO_ALTO</code> toda operacion de USD 3.000 o
+mas &mdash; 263 en esta corrida &mdash; y se
+etiquetan las 89 transacciones
+rechazadas.</p>
+<table>
+  <thead><tr><th>Grupo de la entidad (resuelto en vuelo)</th>
+    <th>Transacciones</th><th>Reparto</th></tr></thead>
+  <tbody><tr><td>PEQUENO</td><td class="n">1.103</td><td class="n">46,0 %</td></tr><tr><td>GRANDE</td><td class="n">965</td><td class="n">40,2 %</td></tr><tr><td>MEDIANO</td><td class="n">332</td><td class="n">13,8 %</td></tr></tbody>
+</table>
+
+<h2>5. Resultados medidos</h2>
+<p>La corrida que documenta este informe emitio 2.400 transacciones a
+lo largo de 123 segundos, es decir 19,6 eventos por
+segundo sostenidos, por un importe agregado de USD
+2,28 millones.</p>
+
+<div class="fig"><svg viewBox="0 0 760 250" width="100%" role="img" aria-label="Transacciones ingeridas por intervalos de diez segundos"><line x1="54" x2="740" y1="204.0" y2="204.0" stroke="#e3ded4" stroke-width="1"/><text x="45" y="208.0" text-anchor="end" font-size="10.5" fill="#8a8b8c">0</text><line x1="54" x2="740" y1="159.5" y2="159.5" stroke="#e3ded4" stroke-width="1"/><text x="45" y="163.5" text-anchor="end" font-size="10.5" fill="#8a8b8c">50</text><line x1="54" x2="740" y1="115.0" y2="115.0" stroke="#e3ded4" stroke-width="1"/><text x="45" y="119.0" text-anchor="end" font-size="10.5" fill="#8a8b8c">100</text><line x1="54" x2="740" y1="70.5" y2="70.5" stroke="#e3ded4" stroke-width="1"/><text x="45" y="74.5" text-anchor="end" font-size="10.5" fill="#8a8b8c">150</text><line x1="54" x2="740" y1="26.0" y2="26.0" stroke="#e3ded4" stroke-width="1"/><text x="45" y="30.0" text-anchor="end" font-size="10.5" fill="#8a8b8c">200</text><rect x="60.9" y="198.7" width="35.3" height="5.3" fill="#ed1c24"/><rect x="109.9" y="28.7" width="35.3" height="175.3" fill="#ed1c24"/><rect x="158.9" y="30.5" width="35.3" height="173.5" fill="#ed1c24"/><rect x="207.9" y="29.6" width="35.3" height="174.4" fill="#ed1c24"/><rect x="256.9" y="29.6" width="35.3" height="174.4" fill="#ed1c24"/><rect x="305.9" y="28.7" width="35.3" height="175.3" fill="#ed1c24"/><rect x="354.9" y="29.6" width="35.3" height="174.4" fill="#ed1c24"/><rect x="403.9" y="33.1" width="35.3" height="170.9" fill="#ed1c24"/><rect x="452.9" y="29.6" width="35.3" height="174.4" fill="#ed1c24"/><rect x="501.9" y="30.5" width="35.3" height="173.5" fill="#ed1c24"/><rect x="550.9" y="31.3" width="35.3" height="172.7" fill="#ed1c24"/><rect x="599.9" y="29.6" width="35.3" height="174.4" fill="#ed1c24"/><rect x="648.9" y="29.6" width="35.3" height="174.4" fill="#ed1c24"/><rect x="697.9" y="161.3" width="35.3" height="42.7" fill="#ed1c24"/><text x="78.5" y="222" text-anchor="middle" font-size="10" fill="#8a8b8c">17:12:00</text><text x="421.5" y="222" text-anchor="middle" font-size="10" fill="#8a8b8c">17:13:10</text><text x="715.5" y="222" text-anchor="middle" font-size="10" fill="#8a8b8c">17:14:10</text><text x="4" y="12" font-size="10" fill="#8a8b8c">transacciones por intervalo de 10 s</text><text x="397" y="244" text-anchor="middle" font-size="9.5" fill="#8a8b8c">hora de emisión (UTC)</text></svg>
+  <div class="cap"><b>Figura 2.</b> Caudal de ingesta del canal near
+  real-time. Cada barra agrupa diez segundos de emision; la regularidad
+  indica que el pipeline absorbe el flujo sin acumular retraso.</div>
+</div>
+
+<div class="fig"><svg viewBox="0 0 760 234" width="100%" role="img" aria-label="Transacciones por canal de atencion"><line x1="168.0" x2="168.0" y1="6" y2="196" stroke="#e3ded4" stroke-width="1"/><text x="168.0" y="216" text-anchor="middle" font-size="10.5" fill="#8a8b8c">0</text><line x1="292.0" x2="292.0" y1="6" y2="196" stroke="#e3ded4" stroke-width="1"/><text x="292.0" y="216" text-anchor="middle" font-size="10.5" fill="#8a8b8c">250</text><line x1="416.0" x2="416.0" y1="6" y2="196" stroke="#e3ded4" stroke-width="1"/><text x="416.0" y="216" text-anchor="middle" font-size="10.5" fill="#8a8b8c">500</text><line x1="540.0" x2="540.0" y1="6" y2="196" stroke="#e3ded4" stroke-width="1"/><text x="540.0" y="216" text-anchor="middle" font-size="10.5" fill="#8a8b8c">750</text><line x1="664.0" x2="664.0" y1="6" y2="196" stroke="#e3ded4" stroke-width="1"/><text x="664.0" y="216" text-anchor="middle" font-size="10.5" fill="#8a8b8c">1.000</text><text x="156" y="24" text-anchor="end" font-size="11" fill="#231f20">Banca móvil</text><path d="M168 12 H612.4 a4,4 0 0 1 4,4 v9 a4,4 0 0 1 -4,4 H168 Z" fill="#231f20"/><text x="626.4" y="24" font-size="10.5" font-weight="600" fill="#231f20">904  <tspan fill="#8a8b8c" font-weight="400">37,7 %</tspan></text><text x="156" y="56" text-anchor="end" font-size="11" fill="#231f20">Cajero automático</text><path d="M168 44 H418.4 a4,4 0 0 1 4,4 v9 a4,4 0 0 1 -4,4 H168 Z" fill="#231f20"/><text x="432.4" y="56" font-size="10.5" font-weight="600" fill="#231f20">513  <tspan fill="#8a8b8c" font-weight="400">21,4 %</tspan></text><text x="156" y="88" text-anchor="end" font-size="11" fill="#231f20">Banca web</text><path d="M168 76 H356.9 a4,4 0 0 1 4,4 v9 a4,4 0 0 1 -4,4 H168 Z" fill="#231f20"/><text x="370.9" y="88" font-size="10.5" font-weight="600" fill="#231f20">389  <tspan fill="#8a8b8c" font-weight="400">16,2 %</tspan></text><text x="156" y="120" text-anchor="end" font-size="11" fill="#231f20">POS en comercio</text><path d="M168 108 H310.3 a4,4 0 0 1 4,4 v9 a4,4 0 0 1 -4,4 H168 Z" fill="#231f20"/><text x="324.3" y="120" font-size="10.5" font-weight="600" fill="#231f20">295  <tspan fill="#8a8b8c" font-weight="400">12,3 %</tspan></text><text x="156" y="152" text-anchor="end" font-size="11" fill="#231f20">Ventanilla</text><path d="M168 140 H260.7 a4,4 0 0 1 4,4 v9 a4,4 0 0 1 -4,4 H168 Z" fill="#231f20"/><text x="274.7" y="152" font-size="10.5" font-weight="600" fill="#231f20">195  <tspan fill="#8a8b8c" font-weight="400">8,1 %</tspan></text><text x="156" y="184" text-anchor="end" font-size="11" fill="#231f20">Corresponsal</text><path d="M168 172 H215.6 a4,4 0 0 1 4,4 v9 a4,4 0 0 1 -4,4 H168 Z" fill="#231f20"/><text x="229.6" y="184" font-size="10.5" font-weight="600" fill="#231f20">104  <tspan fill="#8a8b8c" font-weight="400">4,3 %</tspan></text></svg>
+  <div class="cap"><b>Figura 3.</b> Reparto de las transacciones por canal de
+  atencion, calculado por Elasticsearch sobre el indice en vivo.</div>
+</div>
+
+<div class="dos">
+<div>
+<h3>5.1 Latencia extremo a extremo</h3>
+<p>Cada evento lleva su propia medida: el pipeline resta la marca temporal
+que fijo el origen del instante en que Logstash lo procesa.</p>
+<table>
+  <thead><tr><th>Percentil</th><th>Latencia</th></tr></thead>
+  <tbody>
+    <tr><td>p50</td><td class="n">645 ms</td></tr>
+    <tr><td>p90</td><td class="n">1.050 ms</td></tr>
+    <tr><td>p95</td><td class="n">1.099 ms</td></tr>
+    <tr><td>p99</td><td class="n">1.142 ms</td></tr>
+  </tbody>
+</table>
+</div>
+<div>
+<h3>5.2 Tipo de operacion</h3>
+<p>La distribucion reproduce el perfil del gasto minorista, con predominio
+del consumo con tarjeta y del retiro en efectivo.</p>
+<table>
+  <thead><tr><th>Tipo</th><th>Transacciones</th></tr></thead>
+  <tbody><tr><td>Retiro</td><td class="n">626</td></tr><tr><td>Consumo Tarjeta</td><td class="n">616</td></tr><tr><td>Transferencia</td><td class="n">451</td></tr><tr><td>Pago Servicio</td><td class="n">416</td></tr><tr><td>Deposito</td><td class="n">291</td></tr></tbody>
+</table>
+</div>
+</div>
+
+<h3>5.3 Reparto de la memoria</h3>
+<p>El equipo dedica 3,83 GiB a Docker, cifra inferior a la que reclaman los
+tres servicios de la pila con su configuracion por defecto. La tabla recoge
+el consumo real de los ocho contenedores en marcha.</p>
+<table>
+  <thead><tr><th>Contenedor</th><th>En uso (MB)</th>
+    <th>Límite fijado (MB)</th></tr></thead>
+  <tbody><tr><td><code>elk_elasticsearch</code></td><td class="n">1.067</td><td class="n">1.399</td></tr><tr><td><code>elk_logstash</code></td><td class="n">855</td><td class="n">1.024</td></tr><tr><td><code>elk_kibana</code></td><td class="n">452</td><td class="n">800</td></tr><tr><td><code>elk_filebeat</code></td><td class="n">95</td><td class="n">150</td></tr><tr><td><code>etl_postgres</code></td><td class="n">51</td><td class="n">—</td></tr><tr><td><code>etl_mysql</code></td><td class="n">43</td><td class="n">—</td></tr><tr><td><code>etl_runtime</code></td><td class="n">36</td><td class="n">—</td></tr><tr><td><code>etl_adminer</code></td><td class="n">6</td><td class="n">—</td></tr>
+    <tr><th>Total</th><th class="n">2.609</th>
+        <th class="n"></th></tr>
+  </tbody>
+</table>
+
+<h2>6. Modelo de datos en Elasticsearch</h2>
+<p>Se registran cinco plantillas de indice antes de cualquier escritura. La
+plantilla fija el tipo de cada campo, la ausencia de replicas &mdash;
+obligada en un cluster de un solo nodo &mdash; y un analizador
+<code>es_sin_tildes</code> que aplica <i>asciifolding</i>, de modo que la
+busqueda de <span style="white-space:nowrap">«ATLANTIDA»</span> encuentra
+tambien <span style="white-space:nowrap">«ATLÁNTIDA»</span>: los boletines
+del regulador mezclan ambas grafias.</p>
+<p>El canal de transacciones no escribe en un indice corriente sino en un
+<b>flujo de datos</b> (<i>data stream</i>), la estructura que Elasticsearch
+reserva a series temporales de alta rotacion. Solo admite escrituras de
+tipo <code>create</code> y delega en una politica de ciclo de vida el
+relevo de indices y su eliminacion.</p>
+<table>
+  <thead><tr><th>Aspecto</th><th>Configuración</th></tr></thead>
+  <tbody>
+    <tr><td>Flujo de datos</td><td><code>banca-transacciones</code>, generación
+      1, 1 índice(s) de respaldo</td></tr>
+    <tr><td>Política de ciclo de vida</td>
+      <td><code>banca-nrt</code> &mdash; relevo al
+      alcanzar 1 GB o un día; eliminación a los 7 días</td></tr>
+    <tr><td>Refresco</td><td>1 s en el canal en vivo · 5 s en los índices
+      de lote</td></tr>
+    <tr><td>Fragmentos</td><td>1 primario y 0 réplicas por índice</td></tr>
+  </tbody>
+</table>
+
+<h2>7. Explotacion en Kibana</h2>
+<p>Los objetos de Kibana se crean por script y no a mano, para que el
+entregable sea reproducible: se declaran seis vistas de datos &mdash; una
+por flujo &mdash; y un tablero de cuatro paneles que confronta
+deliberadamente los dos esquemas en una misma pantalla. Los dos paneles
+superiores muestran el historico mensual del almacen; los dos inferiores,
+el caudal de transacciones por minuto y la latencia de ingesta p95, que solo
+tienen sentido en el carril en vivo.</p>
+
+<h2>8. Verificacion</h2>
+<p>El script <code>elk/03_verificacion.sh</code> ejecuta ocho pruebas sobre
+el sistema en marcha.</p>
+<table>
+  <thead><tr><th>Prueba</th><th>Resultado</th></tr></thead>
+  <tbody>
+    <tr><td>Salud del clúster</td><td>Estado green,
+      34 fragmentos activos,
+      0 sin asignar</td></tr>
+    <tr><td>Conciliación de filas B1 (PostgreSQL ↔ Elasticsearch)</td>
+      <td>176.990 en ambos extremos</td></tr>
+    <tr><td>Conciliación de importes B1</td>
+      <td>USD 2.926.925,37 millones en ambos extremos</td></tr>
+    <tr><td>Carga de catálogos B2</td>
+      <td>26 entidades y
+      126 cantones</td></tr>
+    <tr><td>Carga del CSV B3</td>
+      <td>9.432 documentos, igual que
+      las líneas del fichero</td></tr>
+    <tr><td>Canal near real-time N1</td>
+      <td>2.400 transacciones, p95 de 1.099 ms</td></tr>
+    <tr><td>Sondeo incremental N2</td>
+      <td>29 registros y marca de agua
+      persistida en disco</td></tr>
+    <tr><td>Enriquecimiento entre carriles</td>
+      <td>0 transacciones sin
+      correspondencia en el catálogo</td></tr>
+  </tbody>
+</table>
+
+<h2>9. Retos encontrados</h2>
+<p>Se documentan los 19 obstaculos que exigieron un cambio de diseno o de
+configuracion. Todos se manifestaron durante la implementacion y ninguno
+aparecia en la documentacion consultada de forma evidente; varios eran
+silenciosos, que es lo que los hacia peligrosos.</p>
+<table class="retos">
+  <thead><tr><th>Reto y sintoma observado</th><th>Resolución</th></tr></thead>
+  <tbody><tr><td><b>1. Memoria: el equipo solo ofrece 3,8 GiB a Docker</b><div class="det">Elasticsearch, Logstash y Kibana reclaman en conjunto mas de 4 GiB con su configuracion por defecto, de modo que el stack no arrancaba junto a PostgreSQL y MySQL.</div></td><td class="sol">Se acotaron los <i>heaps</i> de la maquina virtual de Java (Elasticsearch 512 MB, Logstash 384 MB, Kibana 448 MB), se fijo un <code>mem_limit</code> por servicio y se desactivo el <code>performance_schema</code> de MySQL, que por si solo liberó 400 MB. Los ocho contenedores conviven ahora en 2,55 GiB.</td></tr><tr><td><b>2. <code>path.config</code> anula <code>pipelines.yml</code></b><div class="det">Logstash arranco un unico pipeline llamado <code>main</code> que concatenaba los cinco ficheros <code>.conf</code>: cada evento salia por las cinco salidas a la vez. El sintoma fue un indice de transacciones con 18.375 documentos <i>antes</i> de que el simulador se hubiera ejecutado, y documentos cuyo <code>_id</code> era el texto literal <code>%{saldo_sk}</code> porque la sustitucion no aplicaba en el indice equivocado.</div></td><td class="sol">Se elimino <code>path.config</code> de <code>logstash.yml</code>. Esa opcion tiene prioridad sobre <code>pipelines.yml</code> y desactiva el aislamiento entre pipelines.</td></tr><tr><td><b>3. El borrado con comodin se rechaza en silencio</b><div class="det"><code>DELETE /banca-*</code> devuelve un error 400 porque el ajuste <code>action.destructive_requires_name</code> vale <code>true</code> por defecto en Elasticsearch 8. El error viaja en el cuerpo de la respuesta, no en el codigo de salida de <code>curl</code>: al descartar la salida, el purgado parecia correcto y los datos antiguos seguian en el indice.</div></td><td class="sol">El script de reinicio enumera los indices con <code>_cat/indices</code>, los borra <b>por nombre</b> y comprueba que la respuesta contenga <code>acknowledged: true</code>.</td></tr><tr><td><b>4. El estado persistente vive en cinco sitios y ninguno se limpia solo</b><div class="det">Reiniciar el flujo para probar un cambio resulto sorprendentemente dificil. Tras corregir los pipelines, los documentos mal enrutados reaparecian; tras vaciar el registro de Filebeat, volvian a entrar 2.400 transacciones antiguas con latencias de horas. El estado esta repartido en: los indices de Elasticsearch, la cola persistente de Logstash (<code>lsdata</code>), el registro de Filebeat (<code>fbdata</code>), la marca de agua del sondeo incremental y el propio fichero NDJSON. Cada uno reintroduce datos por su cuenta.</div></td><td class="sol">Un unico script, <code>elk/00_reiniciar_flujo.sh</code>, purga los cinco. Ademas hay que <b>eliminar</b> el contenedor y no solo detenerlo: Docker se niega a borrar un volumen que un contenedor todavia referencia, aunque este parado, y el fallo es silencioso.</td></tr><tr><td><b>5. Un pipeline mal configurado no impide que Logstash arranque</b><div class="det">El filtro <code>translate</code> no admite el ajuste <code>tag_on_failure</code>. Logstash arranco con normalidad, los otros cuatro pipelines funcionaron y el puerto 5044 simplemente no quedo a la escucha: Filebeat acumulaba eventos contra un destino que rechazaba la conexion. El registro tenia el motivo, pero la operacion aparentaba haber ido bien.</div></td><td class="sol">El script de reinicio ya no confia en el mensaje de arranque: consulta <code>/_node/pipelines</code> y compara la lista de pipelines activos con los cinco esperados, extrayendo del registro la causa si falta alguno.</td></tr><tr><td><b>6. El punto de entrada de la imagen reescribe la configuracion</b><div class="det">Al declarar <code>XPACK_MONITORING_ENABLED</code> como variable de entorno, el arranque de Logstash intenta reescribir <code>logstash.yml</code>; el montaje es de solo lectura y el contenedor entra en un bucle de reinicio con el mensaje <code>read-only file system</code>.</div></td><td class="sol">El ajuste se declara dentro del propio <code>logstash.yml</code> y se retira del entorno.</td></tr><tr><td><b>7. El controlador de MySQL convierte TINYINT(1) en booleano</b><div class="det">El catalogo marcaba las 26 entidades como <b>no vigentes</b>, incluidas las activas con vigencia hasta el ano 9999. El controlador de MySQL entrega las columnas <code>TINYINT(1)</code> como <code>Boolean</code> &mdash; comportamiento de <code>tinyInt1isBit</code> &mdash;, de modo que la comparacion <code>[es_vigente] == 1</code> escrita en Logstash era siempre falsa. El fallo no produjo ningun error: simplemente el enriquecimiento del canal en vivo dejo de encontrar entidades.</div></td><td class="sol">La conversion se resolvio en la propia consulta, donde el tipo es inequivoco: <code>IF(es_vigente = 1, 'true', 'false')</code>. Logstash solo hace el <code>convert</code> final a booleano.</td></tr><tr><td><b>8. La cola interna de Filebeat marcaba la latencia del canal</b><div class="det">Resuelto el enriquecimiento, la latencia seguia en 5,4 s de mediana y <b>10,3 s en el percentil 99</b>. La cifra delataba la causa: coincide con <code>queue.mem.flush.timeout</code>, que Filebeat fija en 10 s. El agente acumula 1.600 eventos antes de enviar y, si no los reune, espera ese temporizador. A 20 eventos por segundo el umbral no se alcanza nunca, de modo que <b>todos</b> los lotes salian por vencimiento del reloj y no por volumen.</div></td><td class="sol">Se bajo el umbral a 32 eventos y el temporizador a 1 s. La latencia p99 paso de 10.257 ms a 1.142 ms sin tocar ningun otro componente. En un canal near real-time el compromiso se invierte: conviene enviar lotes pequenios a menudo antes que lotes grandes con retraso.</td></tr><tr><td><b>9. Una consulta por evento hunde la latencia</b><div class="det">El enriquecimiento se implemento primero con el filtro <code>elasticsearch</code>, que consulta el indice del catalogo <b>una vez por evento</b>. Cada consulta es un viaje de ida y vuelta por HTTP: el pipeline no lograba sostener 20 eventos por segundo, la cola crecia sin limite y la latencia p99 alcanzo <b>313 segundos</b>. Un canal near real-time con esa latencia deja de serlo.</div></td><td class="sol">Una dimension de 25 filas no se consulta por red. Se materializa como diccionario y el filtro <code>translate</code> la resuelve en memoria, con recarga cada 300 s. El coste por evento pasa de una peticion de red a una busqueda en un mapa.</td></tr><tr><td><b>10. El vaciado por linea contra un montaje de macOS estrangula al generador</b><div class="det">El generador escribia el fichero NDJSON en un directorio del anfitrion montado en el contenedor, con <code>flush()</code> tras cada linea. Cada escritura sincrona sobre ese tipo de montaje cuesta milisegundos: el simulador solicitado a 20 eventos por segundo entregaba 5,6, y en una corrida se detuvo cinco minutos y medio.</div></td><td class="sol">El fichero se traslado a un <b>volumen de Docker compartido</b> entre el generador y Filebeat, con lo que el sistema de ficheros del anfitrion sale del camino critico. El <code>flush()</code> se mantiene, porque sin el Filebeat no ve las lineas.</td></tr><tr><td><b>11. La clave natural del CSV no es unica</b><div class="det">La huella de idempotencia se calculo primero sobre (fecha, entidad, provincia, canton, segmento). El resultado fueron 9.422 documentos en lugar de 9.432: diez pares de filas comparten esas cinco claves con importes distintos &mdash; en Quito coexisten un registro de USD 1,00 y otro de USD 4.614 millones &mdash;, de modo que la segunda fila sobrescribia a la primera.</div></td><td class="sol">La huella SHA-256 incluye tambien las cuatro medidas. Asi se descartan los duplicados exactos sin perder filas legitimas.</td></tr><tr><td><b>12. Entrega «al menos una vez» frente a idempotencia</b><div class="det">Logstash garantiza que un evento se entrega al menos una vez, no exactamente una vez. Sin identificador de documento, cada reejecucion del flujo batch anadia 176.990 documentos nuevos en lugar de actualizar los existentes.</div></td><td class="sol">Cada flujo define un <code>document_id</code> determinista: la clave subrogada del almacen, la clave compuesta del catalogo o la huella SHA-256 del CSV.</td></tr><tr><td><b>13. Zona horaria del controlador JDBC</b><div class="det">El controlador entrega las columnas <code>DATE</code> en la zona del servidor y Logstash las reinterpreta en UTC. Los cortes de fin de mes retrocedian un dia, con lo que el saldo de mayo caia en abril.</div></td><td class="sol">La consulta extrae la fecha tambien como texto (<code>fecha::text</code>) y el filtro <code>date</code> fija explicitamente <code>America/Guayaquil</code>.</td></tr><tr><td><b>14. El mapeo dinamico convierte los importes en texto</b><div class="det">Si Logstash escribe antes de que exista la plantilla de indice, Elasticsearch deduce el tipo de cada campo. Los <code>NUMERIC</code> quedaban como <code>text</code> y ninguna agregacion (<code>sum</code>, <code>avg</code>) podia ejecutarse.</div></td><td class="sol">Las cinco plantillas se registran antes de levantar Logstash; el orden esta forzado en los scripts numerados.</td></tr><tr><td><b>15. El campo <code>tags</code> heredaba el mapeo dinamico</b><div class="det">Al no declararse en la plantilla, Elasticsearch tipaba <code>tags</code> como texto analizado. El analizador estandar parte <code>_sin_catalogo</code> en dos terminos, asi que la consulta <code>term</code> de la prueba de verificacion nunca coincidia y reportaba cero incidencias aunque las hubiera.</div></td><td class="sol">La plantilla declara <code>tags</code> como <code>keyword</code>. Las etiquetas de control se nombran sin guion bajo inicial.</td></tr><tr><td><b>16. La importacion de objetos de Kibana encadena migraciones antiguas</b><div class="det">El tablero se creo primero con la API de importacion. Kibana devolvia un error 500 y en su registro aparecia <code>Cannot read properties of undefined (reading 'layers')</code>: al importar, el servidor aplica la cadena historica de migraciones del tipo <code>lens</code>, y una de las antiguas espera una estructura que un objeto escrito a mano ya no tiene.</div></td><td class="sol">Los objetos se crean uno a uno con la API de objetos guardados (<code>POST /api/saved_objects/lens/&lt;id&gt;</code>), que los almacena directamente en la version vigente y no ejecuta esa cadena.</td></tr><tr><td><b>17. Un solo nodo no puede alojar replicas</b><div class="det">Con la replica que Elasticsearch crea por omision, los fragmentos quedan sin asignar y el cluster permanece en estado amarillo.</div></td><td class="sol">Las plantillas fijan <code>number_of_replicas: 0</code>. El cluster reporta estado <b>green</b> con 34 fragmentos activos y 0 sin asignar.</td></tr><tr><td><b>18. Dependencia entre el flujo batch y el near real-time</b><div class="det">El enriquecimiento de cada transaccion resuelve la entidad contra el catalogo que comparte con el flujo B2. Si el diccionario no se ha materializado, las transacciones caen a <code>NO_DEFINIDO</code> y se marcan con la etiqueta <code>sin_catalogo</code>.</div></td><td class="sol">El script de preparacion materializa el diccionario ANTES de levantar Logstash, y la prueba V7 cuenta cuantas transacciones quedaron sin correspondencia (0 en esta corrida).</td></tr><tr><td><b>19. Permisos del fichero de configuracion montado</b><div class="det">Filebeat rechaza arrancar si su fichero de configuracion es escribible por otros usuarios. Un volumen montado desde macOS nunca cumple esa comprobacion.</div></td><td class="sol">Se arranca con <code>--strict.perms=false</code>, aceptable en un entorno de desarrollo contenerizado.</td></tr></tbody>
+</table>
+
+<h2>10. Conclusiones</h2>
+<ol>
+  <li>La arquitectura integra <b>cinco fuentes</b> sobre tres tecnologias de
+    origen y las consolida en 189.003 documentos, combinando en un
+    mismo flujo el esquema en lote y el near real-time.</li>
+  <li>Los dos mecanismos de ingesta continua se implementaron de forma
+    contrastada: el empuje mediante Filebeat alcanza una latencia p95 de
+    1.099 ms, mientras que el sondeo incremental por JDBC queda
+    acotado por su intervalo de 15 segundos. La eleccion entre ambos no es
+    de rendimiento sino de control: solo el segundo garantiza que no se
+    pierda un registro si el consumidor esta caido.</li>
+  <li>El enriquecimiento del canal en vivo contra el indice que carga el
+    lote demuestra que los dos carriles no son independientes: el esquema
+    mixto aporta valor precisamente cuando se cruzan.</li>
+  <li>La mayor dificultad no fue el volumen sino los <b>fallos
+    silenciosos</b>: un borrado rechazado que parece exitoso, una cola
+    persistente que reproduce datos viejos y una opcion de configuracion que
+    desactiva el aislamiento entre pipelines. Los tres se detectaron por
+    conciliacion de conteos, no por mensajes de error, lo que justifica que
+    la verificacion forme parte del propio flujo.</li>
+</ol>
+
+<h3>Anexo · Contenido del entregable</h3>
+<table>
+  <thead><tr><th>Ruta</th><th>Contenido</th></tr></thead>
+  <tbody>
+    <tr><td><code>docker/docker-compose.yml</code></td>
+      <td>Nueve servicios; el perfil <code>elk</code> añade los cuatro de
+      la pila</td></tr>
+    <tr><td><code>docker/elk/logstash/pipeline/</code></td>
+      <td>Los cinco pipelines: tres en lote y dos en near real-time</td></tr>
+    <tr><td><code>docker/elk/logstash/config/</code></td>
+      <td>Configuración global y declaración de los pipelines</td></tr>
+    <tr><td><code>docker/elk/filebeat/filebeat.yml</code></td>
+      <td>Agente de cola del canal de transacciones</td></tr>
+    <tr><td><code>elk/00_reiniciar_flujo.sh</code></td>
+      <td>Reinicio limpio de índices, cola persistente y marca de agua</td></tr>
+    <tr><td><code>elk/01_configurar_elasticsearch.sh</code></td>
+      <td>Política de ciclo de vida, cinco plantillas y flujo de datos</td></tr>
+    <tr><td><code>elk/01b_diccionario_entidades.py</code></td>
+      <td>Materializa el diccionario de enriquecimiento en memoria</td></tr>
+    <tr><td><code>elk/02_simulador_transacciones.py</code></td>
+      <td>Generador del canal near real-time</td></tr>
+    <tr><td><code>elk/03_verificacion.sh</code></td>
+      <td>Las ocho pruebas de la sección 8</td></tr>
+    <tr><td><code>elk/04_kibana_objetos.sh</code></td>
+      <td>Seis vistas de datos y el tablero de cuatro paneles</td></tr>
+    <tr><td><code>elk/05_informe_elk.py</code></td>
+      <td>Generador de este informe</td></tr>
+  </tbody>
+</table>
+
+</body></html>

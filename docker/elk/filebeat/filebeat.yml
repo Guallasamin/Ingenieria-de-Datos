@@ -1,0 +1,53 @@
+# =====================================================================
+# Filebeat - agente de cola del flujo NEAR REAL-TIME
+# ---------------------------------------------------------------------
+# Sigue (tail) el fichero NDJSON que escribe el simulador de
+# transacciones y empuja cada linea a Logstash en cuanto aparece.
+#
+# El JSON NO se interpreta aqui a proposito: Filebeat solo transporta.
+# Toda la logica de transformacion vive en el pipeline de Logstash, que
+# es donde se puede versionar y probar.
+# =====================================================================
+
+filebeat.inputs:
+  - type: filestream
+    id: banca-transacciones
+    enabled: true
+    paths:
+      - /logs/transacciones.ndjson
+    # Revision cada segundo: es lo que fija el limite inferior de la
+    # latencia extremo a extremo del canal push.
+    prospector.scanner.check_interval: 1s
+    backoff.init: 100ms
+    backoff.max: 1s
+    close.on_state_change.inactive: 5m
+
+# Sin modulos ni monitoreo: el equipo va justo de memoria.
+filebeat.config.modules.enabled: false
+monitoring.enabled: false
+
+# ---------------------------------------------------------------------
+# Cola interna: es el parametro que fija la latencia del canal
+# ---------------------------------------------------------------------
+# Por omision Filebeat acumula 1.600 eventos ANTES de enviar, y solo si
+# no los reune espera 10 segundos (queue.mem.flush.timeout). A 20 eventos
+# por segundo el umbral no se alcanza nunca, de modo que TODO lote sale
+# por vencimiento del temporizador: la latencia medida era de 5 s en la
+# mediana y 10 s en el percentil 99, exactamente ese temporizador.
+#
+# En un canal near real-time el compromiso se invierte: se prefiere
+# enviar lotes pequenios a menudo antes que lotes grandes con retraso.
+queue.mem:
+  events: 4096
+  flush.min_events: 32
+  flush.timeout: 1s
+
+output.logstash:
+  hosts: ["logstash:5044"]
+  # Lotes pequenios: favorecen la latencia frente al rendimiento, que es
+  # justo el compromiso que se busca en un esquema near real-time.
+  bulk_max_size: 256
+
+# El registro de Filebeat va a la salida estandar del contenedor.
+logging.level: info
+logging.to_files: false

@@ -1,0 +1,27 @@
+# =====================================================================
+# Configuracion global de Logstash
+# =====================================================================
+node.name: banca-logstash
+http.host: "0.0.0.0"
+
+# NO declarar aqui "path.config". Esa opcion tiene prioridad sobre
+# pipelines.yml: Logstash ignoraria los cinco pipelines, concatenaria los
+# cinco .conf en un unico pipeline llamado "main" y enviaria CADA
+# documento a los CINCO indices a la vez (ver "retos" del informe).
+# Al omitirla, se respeta la declaracion de pipelines.yml.
+
+# El equipo dispone de poca memoria: lotes pequenios y pocos hilos.
+pipeline.batch.size: 1000
+pipeline.batch.delay: 50
+
+# Colas persistentes en disco: si Elasticsearch se cae, los eventos
+# near real-time no se pierden en memoria.
+queue.type: persisted
+queue.max_bytes: 256mb
+
+# Se declara AQUI y no como variable de entorno: el entrypoint de la
+# imagen reescribe este fichero cuando encuentra variables XPACK_*, y el
+# montaje es de solo lectura, por lo que el contenedor entra en bucle.
+xpack.monitoring.enabled: false
+
+log.level: info

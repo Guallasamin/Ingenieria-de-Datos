@@ -7,6 +7,12 @@
 #   adminer   -> consola web para inspeccionar ambos motores
 #   metabase  -> capa OLAP / visualizacion del cubo (perfil "bi")
 #   etl       -> runtime Python de respaldo y de carga inicial
+# ---------------------------------------------------------------------
+# Perfil "elk" (Taller Semana 2) -> docker compose --profile elk up -d
+#   elasticsearch -> motor de indexacion y busqueda (destino analitico)
+#   logstash      -> 5 pipelines: 3 batch (JDBC/CSV) + 2 near real-time
+#   kibana        -> exploracion y tableros
+#   filebeat      -> agente de cola (tail) del flujo de transacciones
 # =====================================================================
 name: taller-etl-dw
 
@@ -41,6 +47,9 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --local-infile=1
+      # Ajuste de memoria: libera ~300 MB para el stack ELK (ver informe).
+      - --innodb-buffer-pool-size=128M
+      - --performance-schema=OFF
     environment:
       MYSQL_ROOT_PASSWORD: root_pass_2026
       MYSQL_DATABASE: catalogos_sb
@@ -92,6 +101,10 @@ services:
     volumes:
       - ..:/proyecto
       - pipcache:/root/.cache/pip
+      # Canal near real-time: volumen compartido con Filebeat. No se usa un
+      # bind mount del anfitrion porque en macOS cada escritura con vaciado
+      # inmediato cuesta milisegundos y frena al generador.
+      - nrtlogs:/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,6 +124,113 @@ services:
           psycopg2-binary PyMySQL cryptography weasyprint
         echo ">> Runtime ETL listo (pandas, SQLAlchemy, WeasyPrint)."
         tail -f /dev/null
+
+  # ===================================================================
+  # STACK ELK - perfil "elk"
+  # ===================================================================
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: elk_elasticsearch
+    profiles: ["elk"]
+    restart: unless-stopped
+    environment:
+      node.name: banca-es01
+      cluster.name: banca-ec
+      discovery.type: single-node
+      # Entorno academico de un solo nodo: sin TLS ni autenticacion.
+      # NO apto para produccion (se justifica en el informe).
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      xpack.ml.enabled: "false"
+      # Heap acotado: el equipo solo dispone de 3,8 GiB para Docker.
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      bootstrap.memory_lock: "true"
+      TZ: America/Guayaquil
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile:  { soft: 65536, hard: 65536 }
+    mem_limit: 1400m
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.15.3
+    container_name: elk_logstash
+    profiles: ["elk"]
+    restart: unless-stopped
+    environment:
+      # 384 MB de heap: con 256 MB, Logstash pasaba la carga batch al 89 %
+      # de su limite y la recoleccion de basura frenaba la ingesta.
+      LS_JAVA_OPTS: "-Xms384m -Xmx384m"
+      # Credenciales inyectadas: no se escriben en los .conf del pipeline.
+      PG_USER: etl_user
+      PG_PASS: etl_pass_2026
+      MY_USER: etl_user
+      MY_PASS: etl_pass_2026
+      TZ: America/Guayaquil
+    mem_limit: 1024m
+    ports:
+      - "5044:5044"   # entrada beats (near real-time)
+      - "9600:9600"   # API de monitoreo de Logstash
+    volumes:
+      - ./elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./elk/logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./elk/logstash/drivers:/usr/share/logstash/drivers:ro
+      - ./elk/logstash/diccionario:/usr/share/logstash/diccionario:ro
+      - ../fuentes:/fuentes:ro
+      - lsdata:/usr/share/logstash/data
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.3
+    container_name: elk_kibana
+    profiles: ["elk"]
+    restart: unless-stopped
+    environment:
+      SERVER_NAME: kibana
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      NODE_OPTIONS: "--max-old-space-size=448"
+      TZ: America/Guayaquil
+    mem_limit: 800m
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.15.3
+    container_name: elk_filebeat
+    profiles: ["elk"]
+    restart: unless-stopped
+    user: root
+    # strict.perms=false: el fichero montado desde macOS no cumple la
+    # comprobacion de permisos que exige Filebeat por defecto.
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    environment:
+      TZ: America/Guayaquil
+    mem_limit: 150m
+    volumes:
+      - ./elk/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - nrtlogs:/logs:ro
+      - fbdata:/usr/share/filebeat/data
+    depends_on:
+      - logstash
 
   # Perfil opcional: docker compose --profile bi up -d
   metabase:
@@ -135,3 +255,7 @@ volumes:
   pgdata:
   mysqldata:
   pipcache:
+  esdata:
+  lsdata:
+  fbdata:
+  nrtlogs:

@@ -1,0 +1,46 @@
+{
+ "capturado": "2026-09-03T12:14:47",
+ "servicios": [
+  {
+   "nombre": "elk_filebeat",
+   "uso_mb": 95.9,
+   "limite_mb": 150.0
+  },
+  {
+   "nombre": "elk_logstash",
+   "uso_mb": 855.9,
+   "limite_mb": 1024.0
+  },
+  {
+   "nombre": "etl_runtime",
+   "uso_mb": 36.5,
+   "limite_mb": 3916.8
+  },
+  {
+   "nombre": "elk_kibana",
+   "uso_mb": 452.8,
+   "limite_mb": 800.0
+  },
+  {
+   "nombre": "elk_elasticsearch",
+   "uso_mb": 1067.0,
+   "limite_mb": 1399.8
+  },
+  {
+   "nombre": "etl_mysql",
+   "uso_mb": 43.3,
+   "limite_mb": 3916.8
+  },
+  {
+   "nombre": "etl_adminer",
+   "uso_mb": 6.3,
+   "limite_mb": 3916.8
+  },
+  {
+   "nombre": "etl_postgres",
+   "uso_mb": 51.4,
+   "limite_mb": 3916.8
+  }
+ ],
+ "total_uso_mb": 2609.1
+}
